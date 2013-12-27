@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using DataEx.DataAnnotations;
 
 namespace DataEx
 {
@@ -35,6 +36,16 @@ namespace DataEx
 
         #region Method Implementation
 
+        public IEnumerable<ColumnDefinition> GetNonAutoIncrementColumns()
+        {
+            return Columns.Where(i => !i.IsAutoIncrement);
+        } 
+
+        public IEnumerable<ColumnDefinition> GetNonKeyColumns()
+        {
+            return Columns.Where(i => !i.IsKey);
+        } 
+
         public IEnumerable<ColumnDefinition> GetPrimaryKeys()
         {
             return Columns.Where(i => i.IsKey);
@@ -55,15 +66,15 @@ namespace DataEx
             {
                 var key = property.GetCustomAttribute<KeyAttribute>();
                 var columnInfo = property.GetCustomAttribute<ColumnAttribute>();
+                var autoNumeric = property.GetCustomAttribute<AutoIncrementAttribute>();
                 var columnName = columnInfo != null ? columnInfo.Name : property.Name;
                 var column = new ColumnDefinition()
                     {
                         ColumnName = columnName,
                         FieldName = property.Name,
                         IsKey = key != null,
-                        Property = property,
-                        GetMethod = property.GetGetMethod(),
-                        SetMethod = property.GetSetMethod()
+                        IsAutoIncrement = (autoNumeric != null) || (property.Name.Equals("Id") && property.PropertyType == typeof(int))
+                       
                     };
                 AddColumn(column);
             }
@@ -86,8 +97,6 @@ namespace DataEx
         public bool IsKey { get; set; }
         public bool IsUnique { get; set; }
         public bool AllowNulls { get; set; }
-        public PropertyInfo Property { get; set; }
-        public MethodInfo GetMethod { get; set; }
-        public MethodInfo SetMethod { get; set; }
+        public bool IsAutoIncrement { get; set; }
     }
 }

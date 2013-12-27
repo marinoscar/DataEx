@@ -15,14 +15,12 @@ namespace UtilEx
 
         private readonly Type _targetType;
         private readonly Func<T> _instanceCreator;
-        private static Dictionary<Type, object> _instances; 
-
 
         #endregion
 
         #region Constructors
 
-        private ClassHelper()
+        public ClassHelper()
         {
             _targetType = typeof(T);
             _instanceCreator = GetConstructor();
@@ -34,19 +32,6 @@ namespace UtilEx
             {
                 PropertyInfos[propertyInfo.Name] = propertyInfo;
             }
-        }
-
-        public static ClassHelper<TType> CreateInstance<TType>() where TType : class
-        {
-            var type = typeof (TType);
-            if(_instances == null)
-                _instances = new Dictionary<Type, object>();
-            if (_instances.ContainsKey(type))
-                return (ClassHelper<TType>)_instances[type];
-            var item = new ClassHelper<TType>();
-            _instances[type] = item;
-            return item;
-
         } 
 
         #endregion

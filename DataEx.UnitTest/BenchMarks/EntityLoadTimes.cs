@@ -36,7 +36,7 @@ namespace DataEx.UnitTest.BenchMarks
         [Test]
         public void WhenUsingDelegates()
         {
-            var helper = ClassHelper<DataModel>.CreateInstance<DataModel>();
+            var helper = new ClassHelper<DataModel>();
             var sw = Stopwatch.StartNew();
             for (var i = 0; i < TotalLoads; i++)
             {

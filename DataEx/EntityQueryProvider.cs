@@ -8,39 +8,98 @@ using UtilEx;
 
 namespace DataEx
 {
-    public class EntityQueryProvider<T> where T : class
+    public abstract class EntityQueryProvider<T> where T : class
     {
 
-        private Type _targetType;
-
-        public EntityQueryProvider()
+        protected EntityQueryProvider()
         {
-            _targetType = typeof(T);
-            _tableDefinition = new TableDefinition<T>();
+            TableDefinition = new TableDefinition<T>();
+            ClassHelper = new ClassHelper<T>();
         }
 
         #region Variable Declaration
 
-        private TableDefinition<T> _tableDefinition;
+        protected const int BatchSize = 9216;
+        protected readonly TableDefinition<T> TableDefinition;
+        protected readonly ClassHelper<T> ClassHelper;
 
         #endregion
 
         #region Method Implementation
 
+        protected abstract IEnumerable<string> GetBatchInsertStatement(IEnumerable<T> items);
+        protected abstract IEnumerable<string> GetUpsertStatement(IEnumerable<T> items);
+
+        protected string GetInsertHeader()
+        {
+            return "INSERT INTO {0} ({1}) VALUES".Fi(TableDefinition.TableName,
+                                              string.Join(", ", TableDefinition.GetNonAutoIncrementColumns()));
+        }
+
+        protected string GetInsertValues(T item)
+        {
+            return "({0})".Fi(TableDefinition.GetNonAutoIncrementColumns().Select(i => ClassHelper.GetPropertyValue<object>(item, i.FieldName).ToSql()));
+        }
+
+        public string GetInsertStatement(T item)
+        {
+            return "{0} {1}".Fi(GetInsertHeader(), GetInsertValues(item));
+        }
+
         public string GetSelectStatement(Expression<Func<T, bool>> expression)
         {
-            return "SELECT {0} FROM {1} WHERE".Fi(string.Join(",", _tableDefinition.Columns.Select(i => i.ColumnName)), _tableDefinition.TableName,
+            return "SELECT {0} FROM {1} WHERE {2}".Fi(string.Join(",", TableDefinition.Columns.Select(i => i.ColumnName)), TableDefinition.TableName,
                                                   GetWhereStatement(expression));
         }
 
-        public string UpdateStatement(T item)
+        public string GetSelectStatement(T item)
         {
-            throw new NotImplementedException("");
+            return "SELECT {0} FROM {1} WHERE {2}".Fi(string.Join(",", TableDefinition.Columns.Select(i => i.ColumnName)), TableDefinition.TableName, GetPrimaryKeyValueAssigment(item));
+        }
+
+        public string GetUpdateStatement(T item)
+        {
+            return "UPDATE {0} SET {1} WHERE {2}".Fi(TableDefinition.TableName, GetFieldValueAssigment(item), GetPrimaryKeyValueAssigment(item));
+        }
+
+        public string GetUpdateStatement(T item, Expression<Func<T, bool>> expression)
+        {
+            return "UPDATE {0} SET {1} WHERE {2}".Fi(TableDefinition.TableName, GetFieldValueAssigment(item), GetWhereStatement(expression));
+        }
+
+        public string GetDeleteStatement(T item)
+        {
+            return "DELETE FROM {0} WHERE {1}".Fi(TableDefinition.TableName, GetPrimaryKeyValueAssigment(item));
+        }
+
+        public string GetDeleteStatement(Expression<Func<T, bool>> expression)
+        {
+            return "DELETE FROM {0} WHERE {1}".Fi(TableDefinition.TableName, GetWhereStatement(expression));
         }
 
         public string GetWhereStatement(Expression<Func<T, bool>> expression)
         {
             return ResolveExpression(expression.Body);
+        }
+
+        private string GetPrimaryKeyValueAssigment(T item)
+        {
+            return GetFieldAssigment(item, TableDefinition.GetPrimaryKeys(), " And ");
+        }
+
+        private string GetFieldValueAssigment(T item)
+        {
+            return GetFieldAssigment(item, TableDefinition.GetNonKeyColumns(), ", ");
+        }
+
+        private string GetFieldAssigment(T item, IEnumerable<ColumnDefinition> columns, string separator)
+        {
+            var fields = new List<string>();
+            foreach (var column in columns)
+            {
+                fields.Add("{0} = {1}".Fi(column.ColumnName, ClassHelper.GetPropertyValue<object>(item, column.FieldName).ToSql()));
+            }
+            return string.Join(separator, fields);
         }
 
         private string ResolveBinaryExpression(Expression expression)
@@ -106,8 +165,6 @@ namespace DataEx
 
 
         #endregion
-
-
 
     }
 }

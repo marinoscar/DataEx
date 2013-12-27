@@ -13,7 +13,7 @@ namespace DataEx.UnitTest
         [Test]
         public void ItShouldProcessAEqualityStatement()
         {
-            var queryProvider = new EntityQueryProvider<DataModel>();
+            var queryProvider = new MySqlEntityQueryProvider<DataModel>();
             var result = queryProvider.GetWhereStatement(i => i.Id == 1);
             Assert.AreEqual("(Id = 1)", result);
         }
@@ -21,7 +21,7 @@ namespace DataEx.UnitTest
         [Test]
         public void ItShouldProcessAEqualityStatement1()
         {
-            var queryProvider = new EntityQueryProvider<DataModel>();
+            var queryProvider = new MySqlEntityQueryProvider<DataModel>();
             var result = queryProvider.GetWhereStatement(i => 1 == i.Id);
             Assert.AreEqual("(1 = Id)", result);
         }
@@ -29,7 +29,7 @@ namespace DataEx.UnitTest
         [Test]
         public void ItShouldResolveAndOperator()
         {
-            var queryProvider = new EntityQueryProvider<DataModel>();
+            var queryProvider = new MySqlEntityQueryProvider<DataModel>();
             var result = queryProvider.GetWhereStatement(i => i.LastName == "Marin" && i.Balance > 0d);
             Assert.AreEqual("((LastName = 'Marin') And (Balance > 0))", result);
         }
@@ -37,7 +37,7 @@ namespace DataEx.UnitTest
         [Test]
         public void ItShouldResolveOrOperator()
         {
-            var queryProvider = new EntityQueryProvider<DataModel>();
+            var queryProvider = new MySqlEntityQueryProvider<DataModel>();
             var result = queryProvider.GetWhereStatement(i => i.LastName == "Marin" || i.Balance > 0d);
             Assert.AreEqual("((LastName = 'Marin') Or (Balance > 0))", result);
         }
