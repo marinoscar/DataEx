@@ -8,10 +8,10 @@ using UtilEx;
 
 namespace DataEx
 {
-    public abstract class EntityQueryProvider<T> where T : class
+    public class EntityQueryProvider<T>
     {
 
-        protected EntityQueryProvider()
+        public EntityQueryProvider()
         {
             TableDefinition = new TableDefinition<T>();
             ClassHelper = new ClassHelper<T>();
@@ -27,8 +27,14 @@ namespace DataEx
 
         #region Method Implementation
 
-        protected abstract IEnumerable<string> GetBatchInsertStatement(IEnumerable<T> items);
-        protected abstract IEnumerable<string> GetUpsertStatement(IEnumerable<T> items);
+        protected virtual IEnumerable<string> GetBatchInsertStatement(IEnumerable<T> items)
+        {
+            return null;
+        }
+        protected virtual IEnumerable<string> GetUpsertStatement(IEnumerable<T> items)
+        {
+            return null;
+        }
 
         protected string GetInsertHeader()
         {

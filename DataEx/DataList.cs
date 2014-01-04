@@ -25,7 +25,8 @@ namespace DataEx
 
         #region Properties
 
-        protected List<DataListItem<T>> InnerList { get; private set; }
+        protected internal List<DataListItem<T>> InnerList { get; private set; }
+
         public Expression Expression
         {
             get

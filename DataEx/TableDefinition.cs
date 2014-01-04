@@ -1,29 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Data.Linq.Mapping;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using DataEx.DataAnnotations;
+using ColumnAttribute = System.Data.Linq.Mapping.ColumnAttribute;
+using TableAttribute = System.Data.Linq.Mapping.TableAttribute;
 
 namespace DataEx
 {
-    public class TableDefinition<T> where T : class
+    public class TableDefinition<T>
     {
 
-        private static TableDefinition<T> _instance;  
+
 
         #region Constructor
-        
+
         public TableDefinition()
         {
-            if (_instance != null) return;
             Columns = new List<ColumnDefinition>();
             LoadMetaData();
-            _instance = this;
-        } 
+        }
 
         #endregion
 
@@ -39,12 +39,12 @@ namespace DataEx
         public IEnumerable<ColumnDefinition> GetNonAutoIncrementColumns()
         {
             return Columns.Where(i => !i.IsAutoIncrement);
-        } 
+        }
 
         public IEnumerable<ColumnDefinition> GetNonKeyColumns()
         {
             return Columns.Where(i => !i.IsKey);
-        } 
+        }
 
         public IEnumerable<ColumnDefinition> GetPrimaryKeys()
         {
@@ -54,16 +54,20 @@ namespace DataEx
         public IEnumerable<ColumnDefinition> GetUniqueKeys()
         {
             return Columns.Where(i => i.IsUnique);
-        } 
+        }
 
         private void LoadMetaData()
         {
-            var tableAttr = GetType().GetCustomAttribute<TableAttribute>();
-            TableName = tableAttr == null ? GetType().Name : tableAttr.Name;
+            var type = typeof(T);
+            var tableAttr = type.GetCustomAttribute<TableAttribute>();
+            TableName = tableAttr == null ? type.Name : tableAttr.Name;
             var properties =
-                GetType().GetProperties(BindingFlags.SetProperty | BindingFlags.GetProperty | BindingFlags.Public);
+                type.GetProperties();
             foreach (var property in properties)
             {
+                var notMapped = property.GetCustomAttribute<NotMappedAttribute>();
+                if (notMapped != null) 
+                    continue;
                 var key = property.GetCustomAttribute<KeyAttribute>();
                 var columnInfo = property.GetCustomAttribute<ColumnAttribute>();
                 var autoNumeric = property.GetCustomAttribute<AutoIncrementAttribute>();
@@ -74,7 +78,7 @@ namespace DataEx
                         FieldName = property.Name,
                         IsKey = key != null,
                         IsAutoIncrement = (autoNumeric != null) || (property.Name.Equals("Id") && property.PropertyType == typeof(int))
-                       
+
                     };
                 AddColumn(column);
             }
@@ -85,7 +89,7 @@ namespace DataEx
             ((List<ColumnDefinition>)Columns).Add(column);
         }
 
-        
+
         #endregion
     }
 

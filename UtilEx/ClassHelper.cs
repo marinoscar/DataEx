@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace UtilEx
 {
-    public class ClassHelper<T> where T : class
+    public class ClassHelper<T> 
     {
         #region Variable Declaration
 

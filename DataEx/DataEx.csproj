@@ -47,6 +47,7 @@
     <Compile Include="DataContext.cs" />
     <Compile Include="DataList.cs" />
     <Compile Include="EntityQueryProvider.cs" />
+    <Compile Include="IDataContext.cs" />
     <Compile Include="IDataRecordExtensions.cs" />
     <Compile Include="ITransactionResolver.cs" />
     <Compile Include="LocalContextTransactionResolver.cs" />

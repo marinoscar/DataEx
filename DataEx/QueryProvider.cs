@@ -14,12 +14,12 @@ namespace DataEx
             get { return _items ?? (_items = new Dictionary<string, object>()); }
         }
 
-        public static EntityQueryProvider<T> GetQueryProvider<T>() where T : class
+        public static EntityQueryProvider<T> GetQueryProvider<T>()
         {
             var type = typeof (T).FullName;
             if (Items.ContainsKey(type))
                 return (EntityQueryProvider<T>) Items[type];
-            var newItem = Activator.CreateInstance<EntityQueryProvider<T>>();
+            var newItem = new EntityQueryProvider<T>();
             Items[type] = newItem;
             return newItem;
         }

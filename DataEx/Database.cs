@@ -7,6 +7,7 @@ using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using UtilEx;
@@ -272,18 +273,23 @@ namespace DataEx
         {
             var list = new List<T>();
             var properties = typeof (T).GetProperties();
-            WhileReading(query, r =>
-            {
-                var item = Activator.CreateInstance<T>();
-                for (var i = 0; i < r.FieldCount; i++)
-                {
-                    var propInfo = properties.SingleOrDefault(p => p.Name == r.GetName(i));
-                    if (propInfo == null) continue;
-                    propInfo.SetValue(item, r.GetValue(i));
-                }
-                list.Add(item);
-            });
+            WhileReading(query, r => list.Add(FromDataRecord<T>(r, properties)));
             return list;
+        }
+
+        private T FromDataRecord<T>(IDataRecord r, IEnumerable<PropertyInfo> properties)
+        {
+            var item = Activator.CreateInstance<T>();
+            for (var i = 0; i < r.FieldCount; i++)
+            {
+                var propInfo = properties.SingleOrDefault(p => p.Name == r.GetName(i));
+                if (propInfo == null) continue;
+                var value = r.GetValue(i);
+                if (DBNull.Value.Equals(value)) value = null;
+                else value = Convert.ChangeType(value, propInfo.PropertyType);
+                propInfo.SetValue(item, value);
+            }
+            return item;
         }
 
         public List<Dictionary<string, object>> ExecuteToDictionaryList(string query)
@@ -386,31 +392,31 @@ namespace DataEx
 
         #region CRUD
 
-        public void Insert<T>(T item) where T : class
+        public void Insert<T>(T item)
         {
             var queryProvider = QueryProvider.GetQueryProvider<T>();
             ExecuteNonQuery(queryProvider.GetInsertStatement(item));
         }
 
-        public void Update<T>(T item) where T : class
+        public void Update<T>(T item)
         {
             var queryProvider = QueryProvider.GetQueryProvider<T>();
             ExecuteNonQuery(queryProvider.GetUpdateStatement(item));
         }
 
-        public void Delete<T>(T item) where T : class
+        public void Delete<T>(T item)
         {
             var queryProvider = QueryProvider.GetQueryProvider<T>();
             ExecuteNonQuery(queryProvider.GetDeleteStatement(item));
         }
 
-        public IEnumerable<T> Select<T>() where T : class
+        public IEnumerable<T> Select<T>()
         {
             var queryProvider = QueryProvider.GetQueryProvider<T>();
             return ExecuteToList<T>(queryProvider.GetSelectStatement());
         }
 
-        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression) where T : class
+        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression)
         {
             var queryProvider = QueryProvider.GetQueryProvider<T>();
             return ExecuteToList<T>(queryProvider.GetSelectStatement(expression));
