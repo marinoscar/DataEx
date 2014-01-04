@@ -108,12 +108,12 @@ namespace UtilEx
             return setterDelegate;
         }
 
-        public void SetPropertyValue<TValue>(T target, string propertyName, TValue value)
+        public void SetPropertyValue(T target, string propertyName, object value)
         {
-            SetPropertyValue<TValue>(target, PropertyInfos[propertyName], value);
+            SetPropertyValue(target, PropertyInfos[propertyName], value);
         }
 
-        public void SetPropertyValue<TValue>(T target, PropertyInfo propertyInfo, TValue value)
+        public void SetPropertyValue(T target, PropertyInfo propertyInfo, object value)
         {
             Action<object, object> setProp;
             if (SetPropertyDic.ContainsKey(propertyInfo.Name))

@@ -32,6 +32,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data.Linq" />
     <Reference Include="System.Xml.Linq" />
@@ -42,11 +43,17 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DataAnnotations\AutoIncrementAttribute.cs" />
+    <Compile Include="Database.cs" />
     <Compile Include="DataContext.cs" />
     <Compile Include="DataList.cs" />
     <Compile Include="EntityQueryProvider.cs" />
+    <Compile Include="IDataRecordExtensions.cs" />
+    <Compile Include="ITransactionResolver.cs" />
+    <Compile Include="LocalContextTransactionResolver.cs" />
     <Compile Include="MySqlEntityQueryProvider.cs" />
+    <Compile Include="NullTransactionResolver.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="QueryProvider.cs" />
     <Compile Include="TableDefinition.cs" />
   </ItemGroup>
   <ItemGroup>

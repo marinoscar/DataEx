@@ -52,6 +52,11 @@ namespace DataEx
                                                   GetWhereStatement(expression));
         }
 
+        public string GetSelectStatement()
+        {
+            return "SELECT {0} FROM {1}".Fi(string.Join(",", TableDefinition.Columns.Select(i => i.ColumnName)), TableDefinition.TableName);
+        }
+
         public string GetSelectStatement(T item)
         {
             return "SELECT {0} FROM {1} WHERE {2}".Fi(string.Join(",", TableDefinition.Columns.Select(i => i.ColumnName)), TableDefinition.TableName, GetPrimaryKeyValueAssigment(item));
