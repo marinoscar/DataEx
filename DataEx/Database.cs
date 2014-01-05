@@ -394,19 +394,19 @@ namespace DataEx
 
         public void Insert<T>(T item)
         {
-            var queryProvider = QueryProvider.GetQueryProvider<T>();
+            var queryProvider = QueryProvider.GetQueryProvider(item.GetType());
             ExecuteNonQuery(queryProvider.GetInsertStatement(item));
         }
 
         public void Update<T>(T item)
         {
-            var queryProvider = QueryProvider.GetQueryProvider<T>();
+            var queryProvider = QueryProvider.GetQueryProvider(item.GetType());
             ExecuteNonQuery(queryProvider.GetUpdateStatement(item));
         }
 
         public void Delete<T>(T item)
         {
-            var queryProvider = QueryProvider.GetQueryProvider<T>();
+            var queryProvider = QueryProvider.GetQueryProvider(item.GetType());
             ExecuteNonQuery(queryProvider.GetDeleteStatement(item));
         }
 

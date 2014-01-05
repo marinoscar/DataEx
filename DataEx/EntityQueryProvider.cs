@@ -8,20 +8,20 @@ using UtilEx;
 
 namespace DataEx
 {
-    public class EntityQueryProvider<T>
+    public class EntityQueryProvider<T> : IStandardEntityQueryProvider
     {
 
         public EntityQueryProvider()
         {
             TableDefinition = new TableDefinition<T>();
-            ClassHelper = new ClassHelper<T>();
+            ObjectAccessor = new ReflectionObjectAccessor();
         }
 
         #region Variable Declaration
 
         protected const int BatchSize = 9216;
         protected readonly TableDefinition<T> TableDefinition;
-        protected readonly ClassHelper<T> ClassHelper;
+        protected readonly IObjectAccessor ObjectAccessor;
 
         #endregion
 
@@ -39,12 +39,16 @@ namespace DataEx
         protected string GetInsertHeader()
         {
             return "INSERT INTO {0} ({1}) VALUES".Fi(TableDefinition.TableName,
-                                              string.Join(", ", TableDefinition.GetNonAutoIncrementColumns()));
+                                              string.Join(", ", TableDefinition.GetNonAutoIncrementColumns().Select(i => i.ColumnName)));
         }
 
         protected string GetInsertValues(T item)
         {
-            return "({0})".Fi(TableDefinition.GetNonAutoIncrementColumns().Select(i => ClassHelper.GetPropertyValue<object>(item, i.FieldName).ToSql()));
+            var values =
+                TableDefinition.GetNonAutoIncrementColumns()
+                               .Select(i => ObjectAccessor.GetPropertyValue(item, i.FieldName).ToSql())
+                               .ToList();
+            return "({0})".Fi(string.Join(", ", values));
         }
 
         public string GetInsertStatement(T item)
@@ -108,7 +112,7 @@ namespace DataEx
             var fields = new List<string>();
             foreach (var column in columns)
             {
-                fields.Add("{0} = {1}".Fi(column.ColumnName, ClassHelper.GetPropertyValue<object>(item, column.FieldName).ToSql()));
+                fields.Add("{0} = {1}".Fi(column.ColumnName, ObjectAccessor.GetPropertyValue(item, column.FieldName).ToSql()));
             }
             return string.Join(separator, fields);
         }
@@ -122,12 +126,17 @@ namespace DataEx
             return string.Format("({0} {1} {2})", left, oper, right);
         }
 
+        private bool IsConstantExpression(Type type)
+        {
+            return typeof(ConstantExpression) == type || type.IsSubclassOf(typeof(ConstantExpression));
+        }
+
         private string ResolveExpression(Expression expression)
         {
             var type = expression.GetType();
             if (typeof(MemberExpression) == type || type.IsSubclassOf(typeof(MemberExpression)))
                 return ResolveMemberExpression(expression);
-            if (typeof(ConstantExpression) == type || type.IsSubclassOf(typeof(ConstantExpression)))
+            if (IsConstantExpression(type))
                 return ResolveConstantExpression(expression);
             if (typeof(BinaryExpression) == type || type.IsSubclassOf(typeof(BinaryExpression)))
                 return ResolveBinaryExpression(expression);
@@ -137,13 +146,20 @@ namespace DataEx
         private string ResolveMemberExpression(Expression expression)
         {
             var localExpression = (MemberExpression)expression;
-            return localExpression.Member.Name;
+            return localExpression.Expression != null && IsConstantExpression(localExpression.Expression.GetType()) ? ResolveConstantExpression(localExpression.Expression, localExpression) : localExpression.Member.Name;
         }
 
-        private string ResolveConstantExpression(Expression expression)
+        private string ResolveConstantExpression(Expression expression, MemberExpression memberExpression = null)
         {
             var localExpression = (ConstantExpression)expression;
-            return Convert.ToString(localExpression.Value.ToSql());
+            var value = localExpression.Value;
+            if (Type.GetTypeCode(value.GetType()) == TypeCode.Object && memberExpression != null)
+            {
+                var member = memberExpression.Member.Name;
+                var field = value.GetType().GetField(member);
+                value = field.GetValue(value);
+            }
+            return value.ToSql();
         }
 
         private string ResolveExpressionNodeType(ExpressionType nodeType)
@@ -176,6 +192,28 @@ namespace DataEx
 
 
         #endregion
+
+        public string GetInsertStatement(object item)
+        {
+            return GetInsertStatement((T)item);
+        }
+
+        public string GetUpdateStatement(object item)
+        {
+            return GetUpdateStatement((T)item);
+        }
+
+        public string GetDeleteStatement(object item)
+        {
+            return GetDeleteStatement((T)item);
+        }
+    }
+
+    public interface IStandardEntityQueryProvider
+    {
+        string GetInsertStatement(object item);
+        string GetUpdateStatement(object item);
+        string GetDeleteStatement(object item);
 
     }
 }

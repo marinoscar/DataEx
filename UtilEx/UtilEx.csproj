@@ -32,6 +32,11 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Mvc, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\Facturero\Code\packages\Microsoft.AspNet.Mvc.4.0.20710.0\lib\net40\System.Web.Mvc.dll</HintPath>
+    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -43,6 +48,7 @@
     <Compile Include="Class1.cs" />
     <Compile Include="ClassHelper.cs" />
     <Compile Include="DelegateObjectAccessor.cs" />
+    <Compile Include="HttpParamActionAttribute.cs" />
     <Compile Include="ILObjectAccessor.cs" />
     <Compile Include="IObjectAccessor.cs" />
     <Compile Include="ObjectAccessor.cs" />

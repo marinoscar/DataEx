@@ -29,14 +29,14 @@ namespace DataEx
 
         public DataContext(string connectionString)
         {
-            Items = new Dictionary<Type, object>();
+            Items = new Dictionary<Type, IDataListItems>();
             Database = new Database(connectionString);
         }
         #endregion
 
         #region Property Implementation
 
-        protected Dictionary<Type, object> Items { get; private set; }
+        protected Dictionary<Type, IDataListItems> Items { get; private set; }
         public Database Database { get; private set; }
 
         public static Dictionary<string, IDataContext> DataContexts
@@ -114,24 +114,24 @@ namespace DataEx
             var count = 0;
             foreach (var modelType in Items)
             {
-                var data = (DataList<object>)modelType.Value;
-                var list = data.InnerList;
+                var list = modelType.Value.GetItems();
                 var deleted = list.Where(i => i.Status == DataListItemStatus.Deleted);
                 var inserted = list.Where(i => i.Status == DataListItemStatus.Added);
                 var updated = list.Where(i => i.Status == DataListItemStatus.Updated);
                 foreach (var item in deleted)
                 {
-                    Database.Delete(item);
+                    Database.Delete(item.Value);
                 }
                 foreach (var item in inserted)
                 {
-                    Database.Insert(item);
+                    Database.Insert(item.Value);
                 }
                 foreach (var item in updated)
                 {
-                    Database.Update(item);
+                    Database.Update(item.Value);
                 }
                 count = count + (deleted.Count() + inserted.Count() + updated.Count());
+                modelType.Value.ClearItems();
             }
             return count;
         }

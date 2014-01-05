@@ -23,5 +23,22 @@ namespace DataEx
             Items[type] = newItem;
             return newItem;
         }
+
+        public static IStandardEntityQueryProvider GetQueryProvider(Type type)
+        {
+            var typeName = type.FullName;
+            if (!Items.ContainsKey(typeName))
+            {
+                Items[typeName] = CreateProvider(type);
+            }
+            return (IStandardEntityQueryProvider)Items[typeName];
+        }
+
+        public static IStandardEntityQueryProvider CreateProvider(Type type)
+        {
+            var generic = typeof (EntityQueryProvider<>);
+            var genericType = generic.MakeGenericType(type);
+            return (IStandardEntityQueryProvider)Activator.CreateInstance(genericType);
+        }
     }
 }

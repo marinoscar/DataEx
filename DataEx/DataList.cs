@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace DataEx
 {
-    public class DataList<T> : IList<T>, IList, IDataListItem, IQueryable<T>
+    public class DataList<T> : IList<T>, IList, IDataList, IDataListItems, IQueryable<T>
     {
 
         #region Constructors
@@ -204,9 +204,18 @@ namespace DataEx
 
         #endregion
 
+        public IEnumerable<IDataListItem> GetItems()
+        {
+            return InnerList;
+        }
+
+        public void ClearItems()
+        {
+            InnerList.Clear();
+        }
     }
 
-    public class DataListItem<T>
+    public class DataListItem<T> : IDataListItem
     {
 
         private readonly int _hash;
@@ -218,6 +227,7 @@ namespace DataEx
 
         }
         public T Item { get; set; }
+        public object Value { get { return Item; } }
         public DataListItemStatus Status { get; private set; }
 
         protected internal void UpdateStatus()
@@ -243,9 +253,21 @@ namespace DataEx
         Added, Updated, Deleted, Unchanged
     }
 
-    public interface IDataListItem
+    public interface IDataList
     {
         void UpdateItems();
         int GetItemsChangedCount();
+    }
+
+    public interface IDataListItems
+    {
+        IEnumerable<IDataListItem> GetItems();
+        void ClearItems();
+    }
+
+    public interface IDataListItem
+    {
+        object Value { get; }
+        DataListItemStatus Status { get; }
     }
 }
