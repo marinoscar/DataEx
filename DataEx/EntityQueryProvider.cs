@@ -13,14 +13,14 @@ namespace DataEx
 
         public EntityQueryProvider()
         {
-            TableDefinition = new TableDefinition<T>();
+            TableDefinition = new TableDefinition(typeof(T));
             ObjectAccessor = new ReflectionObjectAccessor();
         }
 
         #region Variable Declaration
 
         protected const int BatchSize = 9216;
-        protected readonly TableDefinition<T> TableDefinition;
+        protected readonly TableDefinition TableDefinition;
         protected readonly IObjectAccessor ObjectAccessor;
 
         #endregion
@@ -56,20 +56,80 @@ namespace DataEx
             return "{0} {1}".Fi(GetInsertHeader(), GetInsertValues(item));
         }
 
-        public string GetSelectStatement(Expression<Func<T, bool>> expression)
+        public string GetSelectStatement(Expression<Func<T, bool>> expression, bool lazyLoading = true)
         {
-            return "SELECT {0} FROM {1} WHERE {2}".Fi(string.Join(",", TableDefinition.Columns.Select(i => i.ColumnName)), TableDefinition.TableName,
-                                                  GetWhereStatement(expression));
+            return @"
+SELECT
+    {0}
+FROM
+    {1}{3}
+WHERE
+    {2}".Fi(GetSelectColumnNames(lazyLoading), TableDefinition.TableName, GetWhereStatement(expression), GetInnerJoins(TableDefinition, lazyLoading));
         }
 
-        public string GetSelectStatement()
+        private string GetInnerJoins(TableDefinition table, bool lazyLoading)
         {
-            return "SELECT {0} FROM {1}".Fi(string.Join(",", TableDefinition.Columns.Select(i => i.ColumnName)), TableDefinition.TableName);
+            if (table.RelatedTables.Count <= 0 || lazyLoading) return string.Empty;
+            var sb = new StringBuilder();
+            sb.AppendLine(" ");
+            foreach (var relation in table.RelatedTables)
+            {
+                sb.AppendLine(" INNER JOIN {0} ON {1}.{2} = {3}.{4}".Fi(relation.TableName, table.TableName,
+                                                                        relation.ForeignKeyColumn.ColumnName, relation.TableName,
+                                                                        relation.PrimaryKeyColumn.ColumnName));
+            }
+            return sb.ToString();
         }
 
-        public string GetSelectStatement(T item)
+        private string GetSelectColumnNames()
         {
-            return "SELECT {0} FROM {1} WHERE {2}".Fi(string.Join(",", TableDefinition.Columns.Select(i => i.ColumnName)), TableDefinition.TableName, GetPrimaryKeyValueAssigment(item));
+            return GetSelectColumnNames(true);
+        }
+
+        private string GetSelectColumnNames(bool lazyLoading)
+        {
+            return GetSelectColumnNames(TableDefinition.Columns, lazyLoading);
+        }
+
+        private string GetSelectColumnNames(IEnumerable<ColumnDefinition> columns, bool lazyLoading = true)
+        {
+            var result = new List<string>();
+            var primaryColumns = string.Join(",",
+                               columns.Select(
+                                   i => string.Format("{0}.{1} As {2}", i.Table.TableName, i.ColumnName, i.FieldName)));
+            result.Add(primaryColumns);
+            if (!lazyLoading)
+            {
+                var table = columns.First().Table;
+                result.AddRange(table.RelatedTables.Select(GetSelectColumnsForFk));
+            }
+            return string.Join(",", result);
+        }
+
+        private string GetSelectColumnsForFk(TableRelationDefinition relation)
+        {
+            return string.Join(",",
+                               relation.Columns.Select(i => string.Format("{0}.{1} As {2}{3}{4}{5}{6}{7}", relation.TableName, i.ColumnName, Database.ExtendedFieldPrefix, relation.PropertyName, Database.ExtendedFieldSeparator, relation.TableType.Name, Database.ExtendedFieldSeparator, i.FieldName)));
+        }
+
+        public string GetSelectStatement(bool lazyLoading = true)
+        {
+            return @"
+SELECT
+    {0}
+FROM
+    {1}{2}".Fi(GetSelectColumnNames(), TableDefinition.TableName, GetInnerJoins(TableDefinition, lazyLoading));
+        }
+
+        public string GetSelectStatement(T item, bool lazyLoading = true)
+        {
+            return @"
+SELECT
+    {0}
+FROM
+    {1}{3}
+WHERE
+    {2}".Fi(GetSelectColumnNames(), TableDefinition.TableName, GetPrimaryKeyValueAssigment(item), GetInnerJoins(TableDefinition, lazyLoading));
         }
 
         public string GetUpdateStatement(T item)
@@ -112,7 +172,7 @@ namespace DataEx
             var fields = new List<string>();
             foreach (var column in columns)
             {
-                fields.Add("{0} = {1}".Fi(column.ColumnName, ObjectAccessor.GetPropertyValue(item, column.FieldName).ToSql()));
+                fields.Add("{0}.{1} = {2}".Fi(column.Table.TableName, column.ColumnName, ObjectAccessor.GetPropertyValue(item, column.FieldName).ToSql()));
             }
             return string.Join(separator, fields);
         }
@@ -146,7 +206,9 @@ namespace DataEx
         private string ResolveMemberExpression(Expression expression)
         {
             var localExpression = (MemberExpression)expression;
-            return localExpression.Expression != null && IsConstantExpression(localExpression.Expression.GetType()) ? ResolveConstantExpression(localExpression.Expression, localExpression) : localExpression.Member.Name;
+            if (IsConstantExpression(localExpression.Expression.GetType()))
+                return ResolveConstantExpression(localExpression.Expression);
+            return "{0}.{1}".Fi(TableDefinition.TableName, localExpression.Member.Name);
         }
 
         private string ResolveConstantExpression(Expression expression, MemberExpression memberExpression = null)

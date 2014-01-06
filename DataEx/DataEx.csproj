@@ -43,9 +43,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DataAnnotations\AutoIncrementAttribute.cs" />
+    <Compile Include="DataAnnotations\RelationAttribute.cs" />
     <Compile Include="Database.cs" />
     <Compile Include="DataContext.cs" />
     <Compile Include="DataList.cs" />
+    <Compile Include="DataRecord.cs" />
     <Compile Include="EntityQueryProvider.cs" />
     <Compile Include="IDataContext.cs" />
     <Compile Include="IDataRecordExtensions.cs" />

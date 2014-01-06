@@ -21,11 +21,15 @@ namespace DataEx
 
         #region Variable Declaration
 
+        public const string ExtendedFieldSeparator = "___";
+        public const string ExtendedFieldPrefix = "extended" + ExtendedFieldSeparator;
         private readonly string _userName;
         private readonly string _serverName;
         private readonly string _databaseName;
         private readonly string _connectionString;
         private DbProviderFactory _providerFactory;
+        private static Dictionary<string, Dictionary<string, PropertyInfo>> _propertyInfos;
+        private static Dictionary<string, List<string>> _typePrimaryFieldNames; 
 
 
         #endregion
@@ -69,6 +73,19 @@ namespace DataEx
         #endregion
 
         #region Static Methods
+
+        private static PropertyInfo GetPropertyInfoCache(Type type, string name)
+        {
+            var typeName = type.FullName;
+            if (!PropertyInfos.ContainsKey(typeName))
+                PropertyInfos[typeName] = new Dictionary<string, PropertyInfo>();
+            if (PropertyInfos[typeName].ContainsKey(name))
+                return PropertyInfos[typeName][name];
+            var property = type.GetProperty(name);
+            if (property == null) return null;
+            PropertyInfos[typeName][name] = property;
+            return property;
+        }
 
         public static void SetDefaultDatabaseProviderType(DatabaseProviderType type)
         {
@@ -155,6 +172,11 @@ namespace DataEx
 
         #region Property Implementation
 
+        private static Dictionary<string, Dictionary<string, PropertyInfo>> PropertyInfos
+        {
+            get { return _propertyInfos ?? (_propertyInfos = new Dictionary<string, Dictionary<string, PropertyInfo>>()); }
+        }
+
         public ITransactionResolver TransactionResolver { get; set; }
 
         public DatabaseProviderType ProviderType { get; private set; }
@@ -181,9 +203,25 @@ namespace DataEx
 
         public int CommandTimeoutInSeconds { get; set; }
 
+        private static Dictionary<string, List<string>> TypePrimaryFieldNames
+        {
+            get { return _typePrimaryFieldNames ?? (_typePrimaryFieldNames = new Dictionary<string, List<string>>()); }
+        }
+
         #endregion
 
         #region Methods
+
+        private static List<string> GetTypePrimaryFieldNames(Type type)
+        {
+            var typename= type.FullName;
+            if (!TypePrimaryFieldNames.ContainsKey(typename))
+            {
+                TypePrimaryFieldNames[typename] = new List<string>();
+                return new List<string>();
+            }
+            return TypePrimaryFieldNames[typename];
+        } 
 
         private static int GetCommandTimeoutFromConfiguration()
         {
@@ -271,25 +309,60 @@ namespace DataEx
 
         public List<T> ExecuteToList<T>(string query)
         {
+            var type = typeof(T);
             var list = new List<T>();
-            var properties = typeof (T).GetProperties();
-            WhileReading(query, r => list.Add(FromDataRecord<T>(r, properties)));
+            IEnumerable<string> names = null;
+            WhileReading(query, r =>
+                {
+                    if (names == null)
+                        names = r.GetNames();
+                    list.Add((T)FromDataRecord(type, r.ToDictionary()));
+                });
             return list;
         }
 
-        private T FromDataRecord<T>(IDataRecord r, IEnumerable<PropertyInfo> properties)
+        private object FromDataRecord(Type type, Dictionary<string, object> d)
         {
-            var item = Activator.CreateInstance<T>();
-            for (var i = 0; i < r.FieldCount; i++)
+            var item = Activator.CreateInstance(type);
+            var fields = d.Keys;
+            var primary = GetTypePrimaryFieldNames(type);
+            var extended = GetExtendedPropertyNames(fields);
+            if (primary.Count <= 0)
             {
-                var propInfo = properties.SingleOrDefault(p => p.Name == r.GetName(i));
+                primary = (from f in fields where !f.StartsWith(ExtendedFieldPrefix) select f).ToList();
+                TypePrimaryFieldNames[type.FullName] = primary;
+            }
+            foreach (var field in primary)
+            {
+                var value = d[field];
+                var propInfo = GetPropertyInfoCache(type, field);
                 if (propInfo == null) continue;
-                var value = r.GetValue(i);
+
                 if (DBNull.Value.Equals(value)) value = null;
                 else value = Convert.ChangeType(value, propInfo.PropertyType);
                 propInfo.SetValue(item, value);
             }
+            foreach (var extendedProperty in extended)
+            {
+                var prop = GetPropertyInfoCache(type, extendedProperty);
+                var colPrefix = "{0}{1}{2}{3}{4}".Fi(ExtendedFieldPrefix, extendedProperty, ExtendedFieldSeparator, prop.PropertyType.Name, ExtendedFieldSeparator);
+                var newDic = d.Where(i => i.Key.StartsWith(colPrefix)).ToDictionary(i => i.Key.Replace(colPrefix, ""), v => v.Value);
+                var value = FromDataRecord(prop.PropertyType, newDic);
+                prop.SetValue(item, value);
+            }
             return item;
+        }
+
+        private IEnumerable<string> GetExtendedPropertyNames(IEnumerable<string> names)
+        {
+            return names.Where(i => i.StartsWith(ExtendedFieldPrefix)).Select(GetPropertyNameFromExtendedColumnName).Distinct().ToList();
+        }
+
+        private string GetPropertyNameFromExtendedColumnName(string name)
+        {
+            var cleanName = name.Replace(ExtendedFieldPrefix, "");
+            var parts = cleanName.Split(ExtendedFieldSeparator.ToCharArray());
+            return parts[0];
         }
 
         public List<Dictionary<string, object>> ExecuteToDictionaryList(string query)
@@ -416,11 +489,11 @@ namespace DataEx
             return ExecuteToList<T>(queryProvider.GetSelectStatement());
         }
 
-        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression)
+        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, bool lazyLoading = true)
         {
             var queryProvider = QueryProvider.GetQueryProvider<T>();
-            return ExecuteToList<T>(queryProvider.GetSelectStatement(expression));
-        } 
+            return ExecuteToList<T>(queryProvider.GetSelectStatement(expression, lazyLoading));
+        }
 
         #endregion
 

@@ -49,5 +49,15 @@ namespace DataEx
             }
             return result;
         }
+
+        public static IEnumerable<string> GetNames(this IDataRecord r)
+        {
+            var names = new List<string>();
+            for (var i = 0; i < r.FieldCount; i++)
+            {
+                names.Add(r.GetName(i));
+            }
+            return names;
+        } 
     }
 }

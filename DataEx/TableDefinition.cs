@@ -12,15 +12,14 @@ using TableAttribute = System.Data.Linq.Mapping.TableAttribute;
 
 namespace DataEx
 {
-    public class TableDefinition<T>
+    public class TableDefinition
     {
-
-
-
         #region Constructor
 
-        public TableDefinition()
+        public TableDefinition(Type type)
         {
+            RelatedTables = new List<TableRelationDefinition>();
+            TableType = type;
             Columns = new List<ColumnDefinition>();
             LoadMetaData();
         }
@@ -29,6 +28,8 @@ namespace DataEx
 
         #region Property Implementation
 
+        public Type TableType { get; private set; }
+        public List<TableRelationDefinition> RelatedTables { get; private set; }
         public IEnumerable<ColumnDefinition> Columns { get; private set; }
         public string TableName { get; private set; }
 
@@ -58,7 +59,7 @@ namespace DataEx
 
         private void LoadMetaData()
         {
-            var type = typeof(T);
+            var type = TableType;
             var tableAttr = type.GetCustomAttribute<TableAttribute>();
             TableName = tableAttr == null ? type.Name : tableAttr.Name;
             var properties =
@@ -66,22 +67,43 @@ namespace DataEx
             foreach (var property in properties)
             {
                 var notMapped = property.GetCustomAttribute<NotMappedAttribute>();
-                if (notMapped != null) 
+                if (notMapped != null)
                     continue;
-                var key = property.GetCustomAttribute<KeyAttribute>();
-                var columnInfo = property.GetCustomAttribute<ColumnAttribute>();
-                var autoNumeric = property.GetCustomAttribute<AutoIncrementAttribute>();
-                var columnName = columnInfo != null ? columnInfo.Name : property.Name;
-                var column = new ColumnDefinition()
-                    {
-                        ColumnName = columnName,
-                        FieldName = property.Name,
-                        IsKey = key != null,
-                        IsAutoIncrement = (autoNumeric != null) || (property.Name.Equals("Id") && property.PropertyType == typeof(int))
-
-                    };
+                var relation = property.GetCustomAttribute<RelationAttribute>();
+                if (relation != null)
+                {
+                    AddForeignKey(relation, property);
+                    continue;
+                }
+                var column = GetColumnFromProperty(property);
+                column.Table = this;
                 AddColumn(column);
             }
+        }
+
+        private ColumnDefinition GetColumnFromProperty(PropertyInfo property)
+        {
+            var key = property.GetCustomAttribute<KeyAttribute>();
+            var columnInfo = property.GetCustomAttribute<ColumnAttribute>();
+            var autoNumeric = property.GetCustomAttribute<AutoIncrementAttribute>();
+            var columnName = columnInfo != null ? columnInfo.Name : property.Name;
+            var column = new ColumnDefinition()
+            {
+                ColumnName = columnName,
+                FieldName = property.Name,
+                IsKey = key != null,
+                IsAutoIncrement = (autoNumeric != null) || (property.Name.Equals("Id") && property.PropertyType == typeof(int))
+
+            };
+            return column;
+        }
+
+        private void AddForeignKey(RelationAttribute relation, PropertyInfo property)
+        {
+            var column = Columns.SingleOrDefault(i => i.ColumnName == relation.ForeignKey) ??
+                         GetColumnFromProperty(TableType.GetProperty(relation.ForeignKey));
+            var tableRelation = new TableRelationDefinition(property.PropertyType, column, relation.PrimaryKey, property.Name);
+            RelatedTables.Add(tableRelation);
         }
 
         public void AddColumn(ColumnDefinition column)
@@ -93,8 +115,24 @@ namespace DataEx
         #endregion
     }
 
+    public class TableRelationDefinition : TableDefinition
+    {
+        public TableRelationDefinition(Type type, ColumnDefinition foreignKey, string primaryKey, string propertyName)
+            : base(type)
+        {
+            ForeignKeyColumn = foreignKey;
+            PrimaryKeyColumn = Columns.Single(i => i.ColumnName == primaryKey);
+            PropertyName = propertyName;
+        }
+
+        public ColumnDefinition ForeignKeyColumn { get; private set; }
+        public ColumnDefinition PrimaryKeyColumn { get; private set; }
+        public string PropertyName { get; private set; }
+    }
+
     public class ColumnDefinition
     {
+        public TableDefinition Table { get; set; }
         public string FieldName { get; set; }
         public string ColumnName { get; set; }
         public int Ordinal { get; set; }
