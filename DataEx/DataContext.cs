@@ -94,6 +94,11 @@ namespace DataEx
             GetDataList<T>().Add(item);
         }
 
+        public void Update<T>(T item)
+        {
+            GetDataList<T>().Add(item, true);
+        }
+
         public void Remove<T>(T item)
         {
             GetDataList<T>().Remove(item);

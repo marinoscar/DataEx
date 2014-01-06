@@ -94,7 +94,15 @@ namespace DataEx
 
         public void Add(T item)
         {
-            InnerList.Add(new DataListItem<T>(item));
+            Add(item, false);
+        }
+
+        public void Add(T item, bool isUpdate)
+        {
+            var newItem = new DataListItem<T>(item);
+            if (isUpdate)
+                newItem.MarkAsUpdated();
+            InnerList.Add(newItem);
         }
 
         public void AddRange(IEnumerable<T> items)
@@ -239,6 +247,11 @@ namespace DataEx
         protected internal void MarkAsDeleted()
         {
             Status = DataListItemStatus.Deleted;
+        }
+
+        protected internal void MarkAsUpdated()
+        {
+            Status = DataListItemStatus.Updated;
         }
 
         protected internal void MarkAsUnChanged()

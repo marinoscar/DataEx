@@ -11,6 +11,7 @@ namespace DataEx
     {
         int SaveChanges();
         void Add<T>(T item);
+        void Update<T>(T item);
         void Remove<T>(T item);
         IQueryable<T> Select<T>(Expression<Func<T, bool>> expression);
         IQueryable<T> Get<T>();
