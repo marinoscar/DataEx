@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using UtilEx;
@@ -215,11 +216,19 @@ WHERE
         {
             var localExpression = (ConstantExpression)expression;
             var value = localExpression.Value;
-            if (Type.GetTypeCode(value.GetType()) == TypeCode.Object && memberExpression != null)
+            if (Type.GetTypeCode(value.GetType()) == TypeCode.Object)
             {
-                var member = memberExpression.Member.Name;
-                var field = value.GetType().GetField(member);
-                value = field.GetValue(value);
+                FieldInfo field;
+                if (memberExpression != null)
+                {
+                    var member = memberExpression.Member.Name;
+                    field = value.GetType().GetField(member);   
+                }
+                else
+                {
+                    field = value.GetType().GetFields().FirstOrDefault();
+                }
+                value = field != null ? field.GetValue(value) : null;
             }
             return value.ToSql();
         }
