@@ -156,7 +156,12 @@ namespace DataEx
 
         public bool Remove(T item)
         {
-            var innerItem = InnerList.Where(i => i.Status != DataListItemStatus.Deleted).Single(i => i.Item.Equals(item));
+            var innerItem = InnerList.Where(i => i.Status != DataListItemStatus.Deleted).SingleOrDefault(i => i.Item.Equals(item));
+            if (innerItem == null)
+            {
+                innerItem = new DataListItem<T>(item);
+                InnerList.Add(innerItem);
+            }
             innerItem.MarkAsDeleted();
             return true;
         }
