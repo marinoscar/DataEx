@@ -199,20 +199,37 @@ WHERE
                 return ResolveMemberExpression(expression);
             if (IsConstantExpression(type))
                 return ResolveConstantExpression(expression);
+            if (typeof(MethodCallExpression) == type || type.IsSubclassOf(typeof(MethodCallExpression)))
+                return ResolveMethodExpression(expression);
             if (typeof(BinaryExpression) == type || type.IsSubclassOf(typeof(BinaryExpression)))
                 return ResolveBinaryExpression(expression);
             throw new ArgumentException(string.Format("Expression type {0} is not supported", type));
+        }
+
+        private string ResolveMethodExpression(Expression expression)
+        {
+            var localExpression = (MethodCallExpression)expression;
+            var memberExpression = (MemberExpression)localExpression.Object;
+            var value = GetConstantValueFromExpression(memberExpression.Expression, memberExpression);
+            return Convert.ToString(localExpression.Method.Invoke(value, null)).ToSql();
         }
 
         private string ResolveMemberExpression(Expression expression)
         {
             var localExpression = (MemberExpression)expression;
             if (IsConstantExpression(localExpression.Expression.GetType()))
-                return ResolveConstantExpression(localExpression.Expression);
+                return ResolveConstantExpression(localExpression.Expression, localExpression);
+            if (!TableDefinition.Columns.Select(i => i.FieldName).Contains(localExpression.Member.Name))
+                return ResolveExpression(localExpression.Expression);
             return "{0}.{1}".Fi(TableDefinition.TableName, localExpression.Member.Name);
         }
 
         private string ResolveConstantExpression(Expression expression, MemberExpression memberExpression = null)
+        {
+            return GetConstantValueFromExpression(expression, memberExpression).ToSql();
+        }
+
+        private object GetConstantValueFromExpression(Expression expression, MemberExpression memberExpression = null)
         {
             var localExpression = (ConstantExpression)expression;
             var value = localExpression.Value;
@@ -222,7 +239,7 @@ WHERE
                 if (memberExpression != null)
                 {
                     var member = memberExpression.Member.Name;
-                    field = value.GetType().GetField(member);   
+                    field = value.GetType().GetField(member);
                 }
                 else
                 {
@@ -230,7 +247,7 @@ WHERE
                 }
                 value = field != null ? field.GetValue(value) : null;
             }
-            return value.ToSql();
+            return value;
         }
 
         private string ResolveExpressionNodeType(ExpressionType nodeType)

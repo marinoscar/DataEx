@@ -91,7 +91,7 @@ namespace DataEx
             {
                 ColumnName = columnName,
                 FieldName = property.Name,
-                IsKey = key != null,
+                IsKey = (key != null || (property.Name.Equals("Id") && property.PropertyType == typeof(int))),
                 IsAutoIncrement = (autoNumeric != null) || (property.Name.Equals("Id") && property.PropertyType == typeof(int))
 
             };

@@ -36,6 +36,12 @@ namespace DataEx
 
         #region Constructors
 
+        public Database()
+            : this(GetDefaultConnectionString())
+        {
+            
+        }
+
         public Database(string connectionString) : this(connectionString, DatabaseProviderType.None, null, new NullTransactionResolver()) { }
 
         public Database(string connectionString, DatabaseProviderType providerType) : this(connectionString, providerType, null, new NullTransactionResolver()) { }
@@ -73,6 +79,17 @@ namespace DataEx
         #endregion
 
         #region Static Methods
+
+        private static string GetDefaultConnectionString()
+        {
+            var defaultConnStringName = ConfigurationManager.AppSettings["defaultConnStringName"];
+            if (string.IsNullOrWhiteSpace(defaultConnStringName) && ConfigurationManager.ConnectionStrings.Count > 0)
+                return ConfigurationManager.ConnectionStrings[0].ConnectionString;
+            var connStringObj = ConfigurationManager.ConnectionStrings[defaultConnStringName];
+            if(connStringObj == null)
+                throw new ArgumentException("No connection string specified");
+            return connStringObj.ConnectionString;
+        }
 
         private static PropertyInfo GetPropertyInfoCache(Type type, string name)
         {

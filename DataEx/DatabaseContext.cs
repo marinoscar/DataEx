@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace DataEx
 {
-    public class DataContext : IDataContext
+    public class DatabaseContext : IDataContext
     {
 
         #region Variable Declaration
@@ -21,13 +21,13 @@ namespace DataEx
 
         #region Constructors
 
-        public DataContext()
+        public DatabaseContext()
             : this(GetDefaultConnString())
         {
 
         }
 
-        public DataContext(string connectionString)
+        public DatabaseContext(string connectionString)
         {
             Items = new Dictionary<Type, IDataListItems>();
             Database = new Database(connectionString);
@@ -130,21 +130,34 @@ namespace DataEx
                 var updated = list.Where(i => i.Status == DataListItemStatus.Updated);
                 foreach (var item in deleted)
                 {
+                    OnDeletingRecord(item.Value);
                     Database.Delete(item.Value);
+                    OnDeletedRecord(item.Value);
                 }
                 foreach (var item in inserted)
                 {
+                    OnInsertingRecord(item.Value);
                     Database.Insert(item.Value);
+                    OnInsertedRecord(item.Value);
                 }
                 foreach (var item in updated)
                 {
+                    OnUpdatingRecord(item.Value);
                     Database.Update(item.Value);
+                    OnUpdatedRecord(item.Value);
                 }
                 count = count + (deleted.Count() + inserted.Count() + updated.Count());
                 modelType.Value.ClearItems();
             }
             return count;
         }
+
+        protected virtual void OnInsertingRecord(object entity) { }
+        protected virtual void OnUpdatingRecord(object entity) { }
+        protected virtual void OnDeletingRecord(object entity) { }
+        protected virtual void OnInsertedRecord(object entity) { }
+        protected virtual void OnUpdatedRecord(object entity) { }
+        protected virtual void OnDeletedRecord(object entity) { }
 
         #endregion
     }

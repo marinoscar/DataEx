@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataEx.UnitTest", "DataEx.U
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UtilEx", "UtilEx\UtilEx.csproj", "{31DF6C48-7A79-4530-A778-396DEB5A8DEA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SecurityEx", "SecurityEx\SecurityEx.csproj", "{657CD80A-3161-4595-B8A7-FF3F48B2AA86}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,6 +27,10 @@ Global
 		{31DF6C48-7A79-4530-A778-396DEB5A8DEA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{31DF6C48-7A79-4530-A778-396DEB5A8DEA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{31DF6C48-7A79-4530-A778-396DEB5A8DEA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{657CD80A-3161-4595-B8A7-FF3F48B2AA86}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{657CD80A-3161-4595-B8A7-FF3F48B2AA86}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{657CD80A-3161-4595-B8A7-FF3F48B2AA86}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{657CD80A-3161-4595-B8A7-FF3F48B2AA86}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

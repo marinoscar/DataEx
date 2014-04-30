@@ -64,7 +64,7 @@ namespace UtilEx
             return FormatInvariant(format, args);
         }
 
-       public static string EscapeMagicSqlLikeChars(this string s)
+        public static string EscapeMagicSqlLikeChars(this string s)
         {
             // make the common case fast
             if (-1 == s.LastIndexOfAny(MagicSqlLikeChars))
@@ -84,7 +84,19 @@ namespace UtilEx
             return s;
         }
 
-        
-        
+        /// <summary>
+        /// Splits the string into an string array of different sizes
+        /// </summary>
+        /// <param name="s">string to work on</param>
+        /// <param name="itemSize">The size of the new string</param>
+        /// <returns>IEnumerable with the new string</returns>
+        public static IEnumerable<string> Split(this string s, int itemSize)
+        {
+            if (s.Length <= itemSize) return new [] { s };
+            return Enumerable.Range(0, s.Length / itemSize).Select(i => s.Substring(i * itemSize, itemSize));
+        }
+
+
+
     }
 }
