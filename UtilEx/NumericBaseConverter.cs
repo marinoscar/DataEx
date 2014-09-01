@@ -11,7 +11,7 @@ namespace UtilEx
     {
         private readonly List<string> _baseValues = new List<string>() { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z" };
 
-        public string ToBase(long value, int numericBase)
+        public string ToBase(ulong value, int numericBase)
         {
             ValidateBase(numericBase);
             var components = new List<string>();
@@ -23,10 +23,10 @@ namespace UtilEx
                 components.Add(_baseValues[remainder]);
             }
             components.Reverse();
-            return string.Join(string.Empty, components);
+            return string.Join(string.Empty, components).ToLowerInvariant();
         }
 
-        public long FromBase(string value, int numericBase)
+        public ulong FromBase(string value, int numericBase)
         {
             ValidateBase(numericBase);
             var values = value.ToUpperInvariant().ToCharArray().Select(i => _baseValues.IndexOf(i.ToString(CultureInfo.InvariantCulture))).ToArray();
@@ -37,7 +37,7 @@ namespace UtilEx
                 var powResult = Math.Pow(numericBase, ((valueCount - i)-1));
                 result = result + (powResult * values[i]);
             }
-            return Convert.ToInt64(result);
+            return Convert.ToUInt64(result);
         }
 
         private void ValidateBase(int numericBase)
@@ -46,17 +46,17 @@ namespace UtilEx
                 throw new ArgumentException("The numeric base needs to be between 2 and {0}".Fi(_baseValues.Count()));
         }
 
-        public string ToBinary(long value)
+        public string ToBinary(ulong value)
         {
             return ToBase(value, 2);
         }
 
-        public string ToHex(long value)
+        public string ToHex(ulong value)
         {
             return ToBase(value, 16);
         }
 
-        public string ToBase36(long value)
+        public string ToBase36(ulong value)
         {
             return ToBase(value, 36);
         }

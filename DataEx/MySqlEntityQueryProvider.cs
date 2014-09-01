@@ -14,14 +14,15 @@ namespace DataEx
 
         }
 
-        protected override IEnumerable<string> GetBatchInsertStatement(IEnumerable<T> items)
+
+        public override IEnumerable<string> GetBulkInsertStatement(IEnumerable<object> items)
         {
             var batches = new List<string>();
             var sb = new StringBuilder(BatchSize);
             sb.AppendFormat("{0}", GetInsertHeader());
             foreach (var item in items)
             {
-                sb.AppendFormat("({0}),", GetInsertValues(item));
+                sb.AppendFormat("({0}),", GetInsertValues((T)item));
                 if (sb.Length > BatchSize)
                 {
                     sb.Length--;
@@ -34,7 +35,6 @@ namespace DataEx
             batches.Add(sb.ToString());
             return batches;
         }
-
 
         private string GetOnDuplicaKeyUpdateStatement()
         {
@@ -51,7 +51,7 @@ namespace DataEx
         protected override IEnumerable<string> GetUpsertStatement(IEnumerable<T> items)
         {
             var batch = new List<string>();
-            batch.AddRange(GetBatchInsertStatement(items));
+            batch.AddRange(GetBulkInsertStatement(items));
             for (var i = 0; i < batch.Count; i++)
             {
                 batch[i] = "{0}{1}".Fi(batch[i], GetOnDuplicaKeyUpdateStatement());

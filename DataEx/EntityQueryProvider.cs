@@ -28,10 +28,6 @@ namespace DataEx
 
         #region Method Implementation
 
-        protected virtual IEnumerable<string> GetBatchInsertStatement(IEnumerable<T> items)
-        {
-            return null;
-        }
         protected virtual IEnumerable<string> GetUpsertStatement(IEnumerable<T> items)
         {
             return null;
@@ -281,17 +277,22 @@ WHERE
 
         #endregion
 
-        public string GetInsertStatement(object item)
+        public virtual string GetInsertStatement(object item)
         {
             return GetInsertStatement((T)item);
         }
 
-        public string GetUpdateStatement(object item)
+        public virtual IEnumerable<string> GetBulkInsertStatement(IEnumerable<object> items)
+        {
+            return items.Select(GetInsertStatement);
+        }
+
+        public virtual string GetUpdateStatement(object item)
         {
             return GetUpdateStatement((T)item);
         }
 
-        public string GetDeleteStatement(object item)
+        public virtual string GetDeleteStatement(object item)
         {
             return GetDeleteStatement((T)item);
         }
@@ -300,6 +301,7 @@ WHERE
     public interface IStandardEntityQueryProvider
     {
         string GetInsertStatement(object item);
+        IEnumerable<string> GetBulkInsertStatement(IEnumerable<object> items);
         string GetUpdateStatement(object item);
         string GetDeleteStatement(object item);
 

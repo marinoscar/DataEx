@@ -279,7 +279,6 @@ namespace DataEx
                 {
                     return default(T);
                 }
-
                 closureGotData = true;
                 return returnedValue;
             });
@@ -474,9 +473,6 @@ namespace DataEx
             conn.ConnectionString = connString;
             return conn;
         }
-
-
-
 
         #endregion
 
