@@ -9,20 +9,20 @@ using UtilEx;
 
 namespace DataEx
 {
-    public class EntityQueryProvider<T> : IStandardEntityQueryProvider
+    public class EntityQueryProvider<T> : IEntityQueryProvider
     {
 
         public EntityQueryProvider()
         {
             TableDefinition = new TableDefinition(typeof(T));
-            ObjectAccessor = new ReflectionObjectAccessor();
+            ObjectAccessor = new FastReflectionObjectAccessor();
         }
 
         #region Variable Declaration
 
         protected const int BatchSize = 9216;
         protected readonly TableDefinition TableDefinition;
-        protected readonly IObjectAccessor ObjectAccessor;
+        protected readonly IObjectAccesor ObjectAccessor;
 
         #endregion
 
@@ -64,7 +64,7 @@ WHERE
     {2}".Fi(GetSelectColumnNames(lazyLoading), TableDefinition.TableName, GetWhereStatement(expression), GetInnerJoins(TableDefinition, lazyLoading));
         }
 
-        private string GetInnerJoins(TableDefinition table, bool lazyLoading)
+        private static string GetInnerJoins(TableDefinition table, bool lazyLoading)
         {
             if (table.RelatedTables.Count <= 0 || lazyLoading) return string.Empty;
             var sb = new StringBuilder();
@@ -183,7 +183,7 @@ WHERE
             return string.Format("({0} {1} {2})", left, oper, right);
         }
 
-        private bool IsConstantExpression(Type type)
+        private static bool IsConstantExpression(Type type)
         {
             return typeof(ConstantExpression) == type || type.IsSubclassOf(typeof(ConstantExpression));
         }
@@ -192,7 +192,7 @@ WHERE
         {
             var type = expression.GetType();
             if (typeof(MemberExpression) == type || type.IsSubclassOf(typeof(MemberExpression)))
-                return ResolveMemberExpression(expression);
+                return ResolveMemberExpression((MemberExpression)expression);
             if (IsConstantExpression(type))
                 return ResolveConstantExpression(expression);
             if (typeof(MethodCallExpression) == type || type.IsSubclassOf(typeof(MethodCallExpression)))
@@ -210,14 +210,18 @@ WHERE
             return Convert.ToString(localExpression.Method.Invoke(value, null)).ToSql();
         }
 
-        private string ResolveMemberExpression(Expression expression)
+        private string ResolveMemberExpression(MemberExpression expression)
         {
-            var localExpression = (MemberExpression)expression;
-            if (IsConstantExpression(localExpression.Expression.GetType()))
-                return ResolveConstantExpression(localExpression.Expression, localExpression);
-            if (!TableDefinition.Columns.Select(i => i.FieldName).Contains(localExpression.Member.Name))
-                return ResolveExpression(localExpression.Expression);
-            return "{0}.{1}".Fi(TableDefinition.TableName, localExpression.Member.Name);
+            if (expression.Expression != null && expression.Expression.NodeType == ExpressionType.Parameter ||
+                expression.Expression.NodeType == ExpressionType.Convert)
+            {
+                var propertyInfo = (PropertyInfo)expression.Member;
+                return "{0}.{1}".Fi(TableDefinition.TableName, TableDefinition.Columns.Single(i => i.FieldName == propertyInfo.Name).ColumnName);
+            }
+            var member = Expression.Convert(expression, typeof(object));
+            var lambda = Expression.Lambda<Func<object>>(member);
+            var getter = lambda.Compile();
+            return getter().ToSql();
         }
 
         private string ResolveConstantExpression(Expression expression, MemberExpression memberExpression = null)
@@ -228,22 +232,26 @@ WHERE
         private object GetConstantValueFromExpression(Expression expression, MemberExpression memberExpression = null)
         {
             var localExpression = (ConstantExpression)expression;
-            var value = localExpression.Value;
-            if (Type.GetTypeCode(value.GetType()) == TypeCode.Object)
-            {
-                FieldInfo field;
-                if (memberExpression != null)
-                {
-                    var member = memberExpression.Member.Name;
-                    field = value.GetType().GetField(member);
-                }
-                else
-                {
-                    field = value.GetType().GetFields().FirstOrDefault();
-                }
-                value = field != null ? field.GetValue(value) : null;
-            }
-            return value;
+            var member = Expression.Convert(localExpression, typeof(object));
+            var lambda = Expression.Lambda<Func<object>>(member);
+            var getter = lambda.Compile();
+            return getter();
+            //var value = localExpression.Value;
+            //if (Type.GetTypeCode(value.GetType()) == TypeCode.Object)
+            //{
+            //    FieldInfo field;
+            //    if (memberExpression != null)
+            //    {
+            //        var member = memberExpression.Member.Name;
+            //        field = value.GetType().GetField(member);
+            //    }
+            //    else
+            //    {
+            //        field = value.GetType().GetFields().FirstOrDefault();
+            //    }
+            //    value = field != null ? field.GetValue(value) : null;
+            //}
+            //return value;
         }
 
         private string ResolveExpressionNodeType(ExpressionType nodeType)
@@ -298,7 +306,7 @@ WHERE
         }
     }
 
-    public interface IStandardEntityQueryProvider
+    public interface IEntityQueryProvider
     {
         string GetInsertStatement(object item);
         IEnumerable<string> GetBulkInsertStatement(IEnumerable<object> items);

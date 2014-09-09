@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using DataEx.DataAnnotations;
+using UtilEx;
 using ColumnAttribute = System.Data.Linq.Mapping.ColumnAttribute;
 using TableAttribute = System.Data.Linq.Mapping.TableAttribute;
 
@@ -32,6 +33,13 @@ namespace DataEx
         public List<TableRelationDefinition> RelatedTables { get; private set; }
         public IEnumerable<ColumnDefinition> Columns { get; private set; }
         public string TableName { get; private set; }
+        public IEnumerable<ColumnDefinition> Keys
+        {
+            get
+            {
+                return Columns == null ? new ColumnDefinition[] { } : Columns.Where(i => i.IsKey);
+            }
+        }
 
         #endregion
 
@@ -79,6 +87,8 @@ namespace DataEx
                 column.Table = this;
                 AddColumn(column);
             }
+            if(!Keys.Any())
+                throw new ArgumentException("The entity {0} does not have a key defined".Fi(TableType.Name));
         }
 
         private ColumnDefinition GetColumnFromProperty(PropertyInfo property)

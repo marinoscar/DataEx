@@ -42,6 +42,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BenchMarks\EntityCreationTimes.cs" />
     <Compile Include="BenchMarks\EntityLoadTimes.cs" />
     <Compile Include="HelpModels.cs" />
     <Compile Include="WhenAWhereStatementIsCreated.cs" />

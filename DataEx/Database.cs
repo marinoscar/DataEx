@@ -28,8 +28,8 @@ namespace DataEx
         private readonly string _databaseName;
         private readonly string _connectionString;
         private DbProviderFactory _providerFactory;
-        private static Dictionary<string, Dictionary<string, PropertyInfo>> _propertyInfos;
-        private static Dictionary<string, List<string>> _typePrimaryFieldNames; 
+        private static Dictionary<string, List<string>> _typePrimaryFieldNames;
+        private IObjectAccesor _objectAccesor;
 
 
         #endregion
@@ -39,7 +39,7 @@ namespace DataEx
         public Database()
             : this(GetDefaultConnectionString())
         {
-            
+
         }
 
         public Database(string connectionString) : this(connectionString, DatabaseProviderType.None, null, new NullTransactionResolver()) { }
@@ -58,6 +58,11 @@ namespace DataEx
         }
 
         public Database(string connectionString, DatabaseProviderType providerType, string defaultAppName, ITransactionResolver transactionResolver)
+            : this(connectionString, providerType, defaultAppName, transactionResolver, new FastReflectionObjectAccessor())
+        {
+        }
+
+        public Database(string connectionString, DatabaseProviderType providerType, string defaultAppName, ITransactionResolver transactionResolver, IObjectAccesor objectAccesor)
         {
             if (providerType == DatabaseProviderType.None && DefaultProvider == DatabaseProviderType.None)
                 providerType = DatabaseProviderType.SqlServer;
@@ -74,6 +79,7 @@ namespace DataEx
 
             CommandTimeoutInSeconds = GetCommandTimeoutFromConfiguration();
             TransactionResolver = transactionResolver;
+            _objectAccesor = objectAccesor;
         }
 
         #endregion
@@ -86,22 +92,9 @@ namespace DataEx
             if (string.IsNullOrWhiteSpace(defaultConnStringName) && ConfigurationManager.ConnectionStrings.Count > 0)
                 return ConfigurationManager.ConnectionStrings[0].ConnectionString;
             var connStringObj = ConfigurationManager.ConnectionStrings[defaultConnStringName];
-            if(connStringObj == null)
+            if (connStringObj == null)
                 throw new ArgumentException("No connection string specified");
             return connStringObj.ConnectionString;
-        }
-
-        private static PropertyInfo GetPropertyInfoCache(Type type, string name)
-        {
-            var typeName = type.FullName;
-            if (!PropertyInfos.ContainsKey(typeName))
-                PropertyInfos[typeName] = new Dictionary<string, PropertyInfo>();
-            if (PropertyInfos[typeName].ContainsKey(name))
-                return PropertyInfos[typeName][name];
-            var property = type.GetProperty(name);
-            if (property == null) return null;
-            PropertyInfos[typeName][name] = property;
-            return property;
         }
 
         public static void SetDefaultDatabaseProviderType(DatabaseProviderType type)
@@ -189,11 +182,6 @@ namespace DataEx
 
         #region Property Implementation
 
-        private static Dictionary<string, Dictionary<string, PropertyInfo>> PropertyInfos
-        {
-            get { return _propertyInfos ?? (_propertyInfos = new Dictionary<string, Dictionary<string, PropertyInfo>>()); }
-        }
-
         public ITransactionResolver TransactionResolver { get; set; }
 
         public DatabaseProviderType ProviderType { get; private set; }
@@ -227,25 +215,8 @@ namespace DataEx
 
         #endregion
 
-        #region Methods
 
-        private static List<string> GetTypePrimaryFieldNames(Type type)
-        {
-            var typename= type.FullName;
-            if (!TypePrimaryFieldNames.ContainsKey(typename))
-            {
-                TypePrimaryFieldNames[typename] = new List<string>();
-                return new List<string>();
-            }
-            return TypePrimaryFieldNames[typename];
-        } 
-
-        private static int GetCommandTimeoutFromConfiguration()
-        {
-            var item = ConfigurationManager.AppSettings["databaseCommandTimeout"];
-            if (string.IsNullOrWhiteSpace(item)) return 60;
-            return Convert.ToInt32(item);
-        }
+        #region Public Methods
 
         public T ExecuteScalar<T>(string query)
         {
@@ -329,56 +300,15 @@ namespace DataEx
             var list = new List<T>();
             IEnumerable<string> names = null;
             WhileReading(query, r =>
-                {
-                    if (names == null)
-                        names = r.GetNames();
+            {
+                if (names == null)
+                    names = r.GetNames();
+                if (CanModelLoadFromDictionary(type))
+                    list.Add((T)FromDictionary(type, r.ToDictionary()));
+                else
                     list.Add((T)FromDataRecord(type, r.ToDictionary()));
-                });
+            });
             return list;
-        }
-
-        private object FromDataRecord(Type type, Dictionary<string, object> d)
-        {
-            var item = Activator.CreateInstance(type);
-            var fields = d.Keys;
-            var primary = GetTypePrimaryFieldNames(type);
-            var extended = GetExtendedPropertyNames(fields);
-            if (primary.Count <= 0)
-            {
-                primary = (from f in fields where !f.StartsWith(ExtendedFieldPrefix) select f).ToList();
-                TypePrimaryFieldNames[type.FullName] = primary;
-            }
-            foreach (var field in primary)
-            {
-                var value = d[field];
-                var propInfo = GetPropertyInfoCache(type, field);
-                if (propInfo == null) continue;
-
-                if (DBNull.Value.Equals(value)) value = null;
-                else value = Convert.ChangeType(value, propInfo.PropertyType);
-                propInfo.SetValue(item, value);
-            }
-            foreach (var extendedProperty in extended)
-            {
-                var prop = GetPropertyInfoCache(type, extendedProperty);
-                var colPrefix = "{0}{1}{2}{3}{4}".Fi(ExtendedFieldPrefix, extendedProperty, ExtendedFieldSeparator, prop.PropertyType.Name, ExtendedFieldSeparator);
-                var newDic = d.Where(i => i.Key.StartsWith(colPrefix)).ToDictionary(i => i.Key.Replace(colPrefix, ""), v => v.Value);
-                var value = FromDataRecord(prop.PropertyType, newDic);
-                prop.SetValue(item, value);
-            }
-            return item;
-        }
-
-        private IEnumerable<string> GetExtendedPropertyNames(IEnumerable<string> names)
-        {
-            return names.Where(i => i.StartsWith(ExtendedFieldPrefix)).Select(GetPropertyNameFromExtendedColumnName).Distinct().ToList();
-        }
-
-        private string GetPropertyNameFromExtendedColumnName(string name)
-        {
-            var cleanName = name.Replace(ExtendedFieldPrefix, "");
-            var parts = cleanName.Split(ExtendedFieldSeparator.ToCharArray());
-            return parts[0];
         }
 
         public List<Dictionary<string, object>> ExecuteToDictionaryList(string query)
@@ -435,6 +365,113 @@ namespace DataEx
             WithConnection(conn => conn);
         }
 
+        public DbConnection GetConnection()
+        {
+            return GetConnection(ProviderType);
+        }
+
+        public DbConnection GetConnection(DatabaseProviderType providerType)
+        {
+            var conn = GetFactoryFromProvider(providerType).CreateConnection();
+            conn.ConnectionString = ConnectionString;
+            return conn;
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        private static List<string> GetTypePrimaryFieldNames(Type type)
+        {
+            var typename = type.FullName;
+            if (!TypePrimaryFieldNames.ContainsKey(typename))
+            {
+                TypePrimaryFieldNames[typename] = new List<string>();
+                return new List<string>();
+            }
+            return TypePrimaryFieldNames[typename];
+        }
+
+        private static int GetCommandTimeoutFromConfiguration()
+        {
+            var item = ConfigurationManager.AppSettings["databaseCommandTimeout"];
+            if (string.IsNullOrWhiteSpace(item)) return 60;
+            return Convert.ToInt32(item);
+        }
+
+        private static bool CanModelLoadFromDictionary(Type modelType)
+        {
+            var cache = ObjectCacheProvider.GetProvider<Type, bool>("canLoadFromDictionary");
+            return cache.GetCacheItem(modelType, t => typeof(IDictionaryLoader).IsAssignableFrom(modelType));
+        }
+
+        private static object FromDictionary(Type type, Dictionary<string, object> d)
+        {
+            if (d == null) throw new ArgumentNullException("d");
+            var item = (IDictionaryLoader)EntityCreator.Create(type);
+            item.LoadFromDictionary(d);
+            return item;
+        }
+
+        private object FromDataRecord(Type type, Dictionary<string, object> d)
+        {
+            return FromDataRecord(type, d, _objectAccesor.Create(type));
+        }
+
+        private object FromDataRecord(Type type, Dictionary<string, object> d, object item)
+        {
+            var fields = d.Keys;
+            var primary = GetTypePrimaryFieldNames(type);
+            var extended = GetExtendedPropertyNames(fields);
+            if (primary.Count <= 0)
+            {
+                primary = (from f in fields where !f.StartsWith(ExtendedFieldPrefix) select f).ToList();
+                TypePrimaryFieldNames[type.FullName] = primary;
+            }
+            foreach (var field in primary)
+            {
+                var value = d[field];
+                if (DBNull.Value.Equals(value)) value = null;
+                _objectAccesor.TrySetPropertyValue(item, field, value);
+            }
+            foreach (var extendedProperty in extended)
+            {
+                var colPrefix = "{0}{1}{2}{3}{4}".Fi(ExtendedFieldPrefix, extendedProperty, ExtendedFieldSeparator, extendedProperty, ExtendedFieldSeparator);
+                var newDic = d.Where(i => i.Key.StartsWith(colPrefix)).ToDictionary(i => i.Key.Replace(colPrefix, ""), v => v.Value);
+                var propertyItem = _objectAccesor.TryGetPropertyValue<object>(item, extendedProperty);
+                if (propertyItem == null)
+                {
+                    //If the property is not initialized on the model constructor then we need
+                    //get the property info to create the object
+                    var propertyInfo = GetPropertyInfo(item, extendedProperty);
+                    propertyItem = _objectAccesor.Create(propertyInfo.PropertyType);
+                }
+                var value = FromDataRecord(propertyItem.GetType(), newDic, propertyItem);
+                _objectAccesor.SetPropertyValue(item, extendedProperty, value);
+            }
+            return item;
+        }
+
+        private static PropertyInfo GetPropertyInfo(object target, string propertyName)
+        {
+            var provider =
+                ObjectCacheProvider.GetProvider<Tuple<Type, string>, PropertyInfo>("ExtendedQueryPropertiesInfo");
+            var key = new Tuple<Type, string>(target.GetType(), propertyName);
+            return provider.GetCacheItem(key, i => i.Item1.GetProperty(i.Item2));
+        }
+
+        private IEnumerable<string> GetExtendedPropertyNames(IEnumerable<string> names)
+        {
+            return names.Where(i => i.StartsWith(ExtendedFieldPrefix)).Select(GetPropertyNameFromExtendedColumnName).Distinct().ToList();
+        }
+
+        private static string GetPropertyNameFromExtendedColumnName(string name)
+        {
+            var cleanName = name.Replace(ExtendedFieldPrefix, "");
+            var parts = cleanName.Split(ExtendedFieldSeparator.ToCharArray());
+            return parts[0];
+        }
+
 
         private DbConnection OpenConnection()
         {
@@ -453,18 +490,6 @@ namespace DataEx
         {
             if (_providerFactory == null) _providerFactory = DbProviderFactories.GetFactory(GetDatabaseProviderName(provider));
             return _providerFactory;
-        }
-
-        public DbConnection GetConnection()
-        {
-            return GetConnection(ProviderType);
-        }
-
-        public DbConnection GetConnection(DatabaseProviderType providerType)
-        {
-            var conn = GetFactoryFromProvider(providerType).CreateConnection();
-            conn.ConnectionString = ConnectionString;
-            return conn;
         }
 
         private DbConnection GetConnection(string connString)
@@ -506,6 +531,11 @@ namespace DataEx
         {
             var queryProvider = QueryProvider.GetQueryProvider<T>();
             return ExecuteToList<T>(queryProvider.GetSelectStatement(expression, lazyLoading));
+        }
+
+        public IEnumerable<T> SelectEager<T>(Expression<Func<T, bool>> expression)
+        {
+            return Select<T>(expression, false);
         }
 
         #endregion
