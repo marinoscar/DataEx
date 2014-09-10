@@ -111,12 +111,12 @@ namespace DataEx
 
         public IQueryable<T> Select<T>(Expression<Func<T, bool>> expression, bool lazyLoading)
         {
-            return Database.Select<T>(expression, lazyLoading).AsQueryable();
+            return Database.Select<T>(expression, null, false, lazyLoading).AsQueryable();
         }
 
         public IQueryable<T> Get<T>()
         {
-            return Database.Select<T>().AsQueryable();
+            return Database.Select<T>(i => true).AsQueryable();
         }
 
         public virtual int SaveChanges()

@@ -3,13 +3,9 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
 using System.Data.Common;
-using System.Data.SqlClient;
-using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using UtilEx;
 
 namespace DataEx
@@ -18,56 +14,42 @@ namespace DataEx
 
     public class Database
     {
-
         #region Variable Declaration
 
-        public const string ExtendedFieldSeparator = "___";
-        public const string ExtendedFieldPrefix = "extended" + ExtendedFieldSeparator;
         private readonly string _userName;
         private readonly string _serverName;
         private readonly string _databaseName;
         private readonly string _connectionString;
-        private DbProviderFactory _providerFactory;
         private static Dictionary<string, List<string>> _typePrimaryFieldNames;
-        private IObjectAccesor _objectAccesor;
-
+        private readonly IObjectAccesor _objectAccesor;
+        private ISqlLanguageProvider _languageProvider;
 
         #endregion
 
         #region Constructors
 
         public Database()
-            : this(GetDefaultConnectionString())
+            : this(DbConfiguration.DefaultConnectionString)
         {
 
         }
 
-        public Database(string connectionString) : this(connectionString, DatabaseProviderType.None, null, new NullTransactionResolver()) { }
+        public Database(string connectionString) : this(connectionString, DatabaseProviderType.None, new NullDbTransactionProvider(), new FastReflectionObjectAccessor(), SqlLanguageProviderFactory.GetProvider(DbConfiguration.DefaultProviderType)) { }
 
-        public Database(string connectionString, DatabaseProviderType providerType) : this(connectionString, providerType, null, new NullTransactionResolver()) { }
+        public Database(string connectionString, DatabaseProviderType providerType) : this(connectionString, providerType, new NullDbTransactionProvider(), new FastReflectionObjectAccessor(), SqlLanguageProviderFactory.GetProvider(providerType)) { }
 
-        public Database(string connectionString, string appNameIfNotSpecified) : this(connectionString, DatabaseProviderType.None, appNameIfNotSpecified, new NullTransactionResolver()) { }
+        public Database(string connectionString, IDbTransactionProvider transactionProvider) : this(connectionString, DatabaseProviderType.None, transactionProvider, new FastReflectionObjectAccessor(), SqlLanguageProviderFactory.GetProvider(DbConfiguration.DefaultProviderType)) { }
 
-        public Database(string connectionString, string defaultAppName, ITransactionResolver transactionResolver) : this(connectionString, DatabaseProviderType.None, defaultAppName, transactionResolver) { }
-
-        public Database(LocalContextTransactionResolver transactionResolver)
-            : this(
-                transactionResolver.Connection.ConnectionString, transactionResolver.ProviderType, "",
-                transactionResolver)
+        public Database(string connectionString, DatabaseProviderType providerType, IDbTransactionProvider transactionProvider)
+            : this(connectionString, providerType, transactionProvider, new FastReflectionObjectAccessor(), SqlLanguageProviderFactory.GetProvider(providerType))
         {
         }
 
-        public Database(string connectionString, DatabaseProviderType providerType, string defaultAppName, ITransactionResolver transactionResolver)
-            : this(connectionString, providerType, defaultAppName, transactionResolver, new FastReflectionObjectAccessor())
+        public Database(string connectionString, DatabaseProviderType providerType, IDbTransactionProvider transactionProvider, IObjectAccesor objectAccesor, ISqlLanguageProvider sqlLanguageProvider)
         {
-        }
+            if (providerType == DatabaseProviderType.None)
+                providerType = DbConfiguration.DefaultProviderType;
 
-        public Database(string connectionString, DatabaseProviderType providerType, string defaultAppName, ITransactionResolver transactionResolver, IObjectAccesor objectAccesor)
-        {
-            if (providerType == DatabaseProviderType.None && DefaultProvider == DatabaseProviderType.None)
-                providerType = DatabaseProviderType.SqlServer;
-            if (providerType == DatabaseProviderType.None && DefaultProvider != DatabaseProviderType.None)
-                providerType = DefaultProvider;
             ProviderType = providerType;
 
             var connString = new DbConnectionStringBuilder { ConnectionString = connectionString };
@@ -77,43 +59,15 @@ namespace DataEx
             _databaseName = GetDatabaseFromConnStringObject(connString);
             _connectionString = connectionString;
 
-            CommandTimeoutInSeconds = GetCommandTimeoutFromConfiguration();
-            TransactionResolver = transactionResolver;
+            CommandTimeoutInSeconds = DbConfiguration.DatabaseCommandTimeout;
+            TransactionProvider = transactionProvider;
             _objectAccesor = objectAccesor;
+            _languageProvider = sqlLanguageProvider;
         }
 
         #endregion
 
         #region Static Methods
-
-        private static string GetDefaultConnectionString()
-        {
-            var defaultConnStringName = ConfigurationManager.AppSettings["defaultConnStringName"];
-            if (string.IsNullOrWhiteSpace(defaultConnStringName) && ConfigurationManager.ConnectionStrings.Count > 0)
-                return ConfigurationManager.ConnectionStrings[0].ConnectionString;
-            var connStringObj = ConfigurationManager.ConnectionStrings[defaultConnStringName];
-            if (connStringObj == null)
-                throw new ArgumentException("No connection string specified");
-            return connStringObj.ConnectionString;
-        }
-
-        public static void SetDefaultDatabaseProviderType(DatabaseProviderType type)
-        {
-            _dbProvider = type;
-        }
-
-        private static DatabaseProviderType _dbProvider;
-
-        public static DatabaseProviderType DefaultProvider
-        {
-            get
-            {
-                if (_dbProvider == DatabaseProviderType.None)
-                    _dbProvider = DatabaseProviderType.MySql;
-                return _dbProvider;
-            }
-            set { _dbProvider = value; }
-        }
 
         private static string GetUserIdFromConnStringObject(DbConnectionStringBuilder connString)
         {
@@ -130,7 +84,7 @@ namespace DataEx
             return string.Empty;
         }
 
-        public static string GetDatabaseFromConnStringObject(DbConnectionStringBuilder connString)
+        private static string GetDatabaseFromConnStringObject(DbConnectionStringBuilder connString)
         {
             if (connString.ContainsKey("Database")) return Convert.ToString(connString["Database"]);
             if (connString.ContainsKey("Initial Catalog")) return Convert.ToString(connString["Initial Catalog"]);
@@ -138,52 +92,11 @@ namespace DataEx
             return string.Empty;
         }
 
-        public static DbProviderFactory GetDefaultFactory()
-        {
-            return DbProviderFactories.GetFactory(GetDatabaseProviderName(DefaultProvider));
-        }
-
-        public static DbProviderFactory GetFactoryFromProvider(DatabaseProviderType provider)
-        {
-            return DbProviderFactories.GetFactory(GetDatabaseProviderName(provider));
-        }
-
-        private static string GetDatabaseProviderName(DatabaseProviderType providerType)
-        {
-            var result = "System.Data.SqlClient";
-            switch (providerType)
-            {
-                case DatabaseProviderType.MySql:
-                    result = "MySql.Data.MySqlClient";
-                    break;
-                case DatabaseProviderType.Postgresql:
-                    result = "Npgsql";
-                    break;
-            }
-            return result;
-        }
-
-        public static DatabaseProviderType GetProviderTypeFromName(string providerName)
-        {
-            var result = DatabaseProviderType.SqlServer;
-            switch (providerName.ToLowerInvariant())
-            {
-                case "mysql.data.mysqlclient":
-                    result = DatabaseProviderType.MySql;
-                    break;
-                case "Npgsql":
-                    result = DatabaseProviderType.Postgresql;
-                    break;
-            }
-            return result;
-        }
-
         #endregion
 
         #region Property Implementation
 
-        public ITransactionResolver TransactionResolver { get; set; }
-
+        public IDbTransactionProvider TransactionProvider { get; set; }
         public DatabaseProviderType ProviderType { get; private set; }
 
         public string Name
@@ -214,7 +127,6 @@ namespace DataEx
         }
 
         #endregion
-
 
         #region Public Methods
 
@@ -265,7 +177,7 @@ namespace DataEx
             return success ? result : defaultOnFailure;
         }
 
-        public void WhileReading(string query, Action<DbDataReader> doSomething)
+        public void WhileReading(string query, Action<IDataReader> doSomething)
         {
             WithDataReader(query, CommandBehavior.Default, r =>
             {
@@ -278,12 +190,12 @@ namespace DataEx
             });
         }
 
-        public object WithDataReader(string query, Func<DbDataReader, object> doSomething)
+        public object WithDataReader(string query, Func<IDataReader, object> doSomething)
         {
             return WithDataReader(query, CommandBehavior.Default, doSomething);
         }
 
-        public object WithDataReader(string query, CommandBehavior behavior, Func<DbDataReader, object> doSomething)
+        public object WithDataReader(string query, CommandBehavior behavior, Func<IDataReader, object> doSomething)
         {
             return WithCommand(query, command =>
             {
@@ -304,9 +216,9 @@ namespace DataEx
                 if (names == null)
                     names = r.GetNames();
                 if (CanModelLoadFromDictionary(type))
-                    list.Add((T)FromDictionary(type, r.ToDictionary()));
+                    list.Add((T)LoadEntityFromDictionary(type, r.ToDictionary()));
                 else
-                    list.Add((T)FromDataRecord(type, r.ToDictionary()));
+                    list.Add((T)LoadEntityFromDataRecord(type, r.ToDictionary()));
             });
             return list;
         }
@@ -318,13 +230,11 @@ namespace DataEx
             return list;
         }
 
-        public object WithConnection(Func<DbConnection, object> doSomething)
+        public object WithConnection(Func<IDbConnection, object> doSomething)
         {
-            var ambientConnection = TransactionResolver.GetConnectionOrNull();
-            if (ambientConnection != null)
+            if (TransactionProvider.ProvideTransaction)
             {
-                if (ambientConnection.State == ConnectionState.Closed) ambientConnection.Open();
-                return doSomething(ambientConnection);
+                return doSomething(OpenConnection(TransactionProvider.GetConnection(ProviderType)));
             }
 
             using (var conn = OpenConnection())
@@ -333,7 +243,7 @@ namespace DataEx
             }
         }
 
-        public object WithCommand(string sqlStatement, Func<DbCommand, object> doSomething)
+        public object WithCommand(string sqlStatement, Func<IDbCommand, object> doSomething)
         {
             return WithConnection(conn =>
             {
@@ -342,7 +252,7 @@ namespace DataEx
                 cmd.CommandText = sqlStatement;
                 cmd.CommandType = CommandType.Text;
                 cmd.Connection = conn;
-                cmd.Transaction = TransactionResolver.GetTransactionOrNull();
+                cmd.Transaction = TransactionProvider.BeginTransaction();
                 cmd.CommandTimeout = CommandTimeoutInSeconds;
                 try
                 {
@@ -350,6 +260,8 @@ namespace DataEx
                 }
                 catch (Exception ex)
                 {
+                    if (cmd.Transaction != null)
+                        cmd.Transaction.Rollback();
                     throw new DataException("Error running statement:\n{0}\n{1}\n\n with user {2}".Fi(sqlStatement, ex.Message, _userName), ex);
                 }
             });
@@ -362,19 +274,7 @@ namespace DataEx
 
         public void TestConnection()
         {
-            WithConnection(conn => conn);
-        }
-
-        public DbConnection GetConnection()
-        {
-            return GetConnection(ProviderType);
-        }
-
-        public DbConnection GetConnection(DatabaseProviderType providerType)
-        {
-            var conn = GetFactoryFromProvider(providerType).CreateConnection();
-            conn.ConnectionString = ConnectionString;
-            return conn;
+            OpenConnection();
         }
 
         #endregion
@@ -392,40 +292,33 @@ namespace DataEx
             return TypePrimaryFieldNames[typename];
         }
 
-        private static int GetCommandTimeoutFromConfiguration()
-        {
-            var item = ConfigurationManager.AppSettings["databaseCommandTimeout"];
-            if (string.IsNullOrWhiteSpace(item)) return 60;
-            return Convert.ToInt32(item);
-        }
-
         private static bool CanModelLoadFromDictionary(Type modelType)
         {
             var cache = ObjectCacheProvider.GetProvider<Type, bool>("canLoadFromDictionary");
             return cache.GetCacheItem(modelType, t => typeof(IDictionaryLoader).IsAssignableFrom(modelType));
         }
 
-        private static object FromDictionary(Type type, Dictionary<string, object> d)
+        private object LoadEntityFromDictionary(Type type, Dictionary<string, object> d)
         {
             if (d == null) throw new ArgumentNullException("d");
-            var item = (IDictionaryLoader)EntityCreator.Create(type);
+            var item = (IDictionaryLoader)_objectAccesor.Create(type);
             item.LoadFromDictionary(d);
             return item;
         }
 
-        private object FromDataRecord(Type type, Dictionary<string, object> d)
+        private object LoadEntityFromDataRecord(Type type, Dictionary<string, object> d)
         {
-            return FromDataRecord(type, d, _objectAccesor.Create(type));
+            return LoadEntityFromDataRecord(type, d, _objectAccesor.Create(type));
         }
 
-        private object FromDataRecord(Type type, Dictionary<string, object> d, object item)
+        private object LoadEntityFromDataRecord(Type type, Dictionary<string, object> d, object item)
         {
             var fields = d.Keys;
             var primary = GetTypePrimaryFieldNames(type);
             var extended = GetExtendedPropertyNames(fields);
             if (primary.Count <= 0)
             {
-                primary = (from f in fields where !f.StartsWith(ExtendedFieldPrefix) select f).ToList();
+                primary = (from f in fields where !f.StartsWith(DbConfiguration.ExtendedFieldPrefix) select f).ToList();
                 TypePrimaryFieldNames[type.FullName] = primary;
             }
             foreach (var field in primary)
@@ -436,7 +329,7 @@ namespace DataEx
             }
             foreach (var extendedProperty in extended)
             {
-                var colPrefix = "{0}{1}{2}{3}{4}".Fi(ExtendedFieldPrefix, extendedProperty, ExtendedFieldSeparator, extendedProperty, ExtendedFieldSeparator);
+                var colPrefix = "{0}{1}{2}{3}{4}".Fi(DbConfiguration.ExtendedFieldPrefix, extendedProperty, DbConfiguration.ExtendedFieldSeparator, extendedProperty, DbConfiguration.ExtendedFieldSeparator);
                 var newDic = d.Where(i => i.Key.StartsWith(colPrefix)).ToDictionary(i => i.Key.Replace(colPrefix, ""), v => v.Value);
                 var propertyItem = _objectAccesor.TryGetPropertyValue<object>(item, extendedProperty);
                 if (propertyItem == null)
@@ -446,7 +339,7 @@ namespace DataEx
                     var propertyInfo = GetPropertyInfo(item, extendedProperty);
                     propertyItem = _objectAccesor.Create(propertyInfo.PropertyType);
                 }
-                var value = FromDataRecord(propertyItem.GetType(), newDic, propertyItem);
+                var value = LoadEntityFromDataRecord(propertyItem.GetType(), newDic, propertyItem);
                 _objectAccesor.SetPropertyValue(item, extendedProperty, value);
             }
             return item;
@@ -460,42 +353,36 @@ namespace DataEx
             return provider.GetCacheItem(key, i => i.Item1.GetProperty(i.Item2));
         }
 
-        private IEnumerable<string> GetExtendedPropertyNames(IEnumerable<string> names)
+        private static IEnumerable<string> GetExtendedPropertyNames(IEnumerable<string> names)
         {
-            return names.Where(i => i.StartsWith(ExtendedFieldPrefix)).Select(GetPropertyNameFromExtendedColumnName).Distinct().ToList();
+            return names.Where(i => i.StartsWith(DbConfiguration.ExtendedFieldPrefix)).Select(GetPropertyNameFromExtendedColumnName).Distinct().ToList();
         }
 
         private static string GetPropertyNameFromExtendedColumnName(string name)
         {
-            var cleanName = name.Replace(ExtendedFieldPrefix, "");
-            var parts = cleanName.Split(ExtendedFieldSeparator.ToCharArray());
+            var cleanName = name.Replace(DbConfiguration.ExtendedFieldPrefix, "");
+            var parts = cleanName.Split(DbConfiguration.ExtendedFieldSeparator.ToCharArray());
             return parts[0];
         }
 
 
-        private DbConnection OpenConnection()
+        private IDbConnection OpenConnection()
         {
-            var conn = GetConnection(ConnectionString);
-            conn.Open();
-            return conn;
+            return OpenConnection(TransactionProvider.GetConnection(ProviderType));
         }
 
-
-        private DbProviderFactory GetFactory()
+        private IDbConnection OpenConnection(IDbConnection conn)
         {
-            return GetFactory(ProviderType);
-        }
-
-        private DbProviderFactory GetFactory(DatabaseProviderType provider)
-        {
-            if (_providerFactory == null) _providerFactory = DbProviderFactories.GetFactory(GetDatabaseProviderName(provider));
-            return _providerFactory;
-        }
-
-        private DbConnection GetConnection(string connString)
-        {
-            var conn = GetFactory().CreateConnection();
-            conn.ConnectionString = connString;
+            try
+            {
+                conn.ConnectionString = ConnectionString;
+                if(conn.State == ConnectionState.Closed)
+                    conn.Open();
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Unable to establish a connection with {0} for user {1}".Fi(ServerName, UserName), ex);
+            }
             return conn;
         }
 
@@ -505,40 +392,53 @@ namespace DataEx
 
         public void Insert<T>(T item)
         {
-            var queryProvider = QueryProvider.GetQueryProvider(item.GetType());
-            ExecuteNonQuery(queryProvider.GetInsertStatement(item));
+            ExecuteNonQuery(_languageProvider.Insert(item));
         }
 
         public void Update<T>(T item)
         {
-            var queryProvider = QueryProvider.GetQueryProvider(item.GetType());
-            ExecuteNonQuery(queryProvider.GetUpdateStatement(item));
+            ExecuteNonQuery(_languageProvider.Update(item));
         }
 
         public void Delete<T>(T item)
         {
-            var queryProvider = QueryProvider.GetQueryProvider(item.GetType());
-            ExecuteNonQuery(queryProvider.GetDeleteStatement(item));
+            ExecuteNonQuery(_languageProvider.Delete(item));
         }
 
-        public IEnumerable<T> Select<T>()
+        public void Upsert<T>(IEnumerable<T> items)
         {
-            var queryProvider = QueryProvider.GetQueryProvider<T>();
-            return ExecuteToList<T>(queryProvider.GetSelectStatement());
+            ExecuteNonQuery(_languageProvider.Upsert(items));
         }
 
-        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, bool lazyLoading = true)
+        #region Select Methods
+
+        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression)
         {
-            var queryProvider = QueryProvider.GetQueryProvider<T>();
-            return ExecuteToList<T>(queryProvider.GetSelectStatement(expression, lazyLoading));
+            return ExecuteToList<T>(_languageProvider.Select(expression, null, false, 0, 0, false));
         }
 
-        public IEnumerable<T> SelectEager<T>(Expression<Func<T, bool>> expression)
+        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, Expression<Func<T, object>> orderBy, bool orderByDescending)
         {
-            return Select<T>(expression, false);
+            return ExecuteToList<T>(_languageProvider.Select(expression, orderBy, orderByDescending, 0, 0, false));
         }
+
+        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, Expression<Func<T, object>> orderBy, bool orderByDescending, bool lazyLoading)
+        {
+            return ExecuteToList<T>(_languageProvider.Select(expression, orderBy, orderByDescending, 0, 0, lazyLoading));
+        }
+
+        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, Expression<Func<T, object>> orderBy, bool orderByDescending, uint take, bool lazyLoading)
+        {
+            return ExecuteToList<T>(_languageProvider.Select(expression, orderBy, orderByDescending, 0, take, lazyLoading));
+        }
+
+        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, Expression<Func<T, object>> orderBy, bool orderByDescending, uint skip, uint take, bool lazyLoading)
+        {
+            return ExecuteToList<T>(_languageProvider.Select(expression, orderBy, orderByDescending, skip, take, lazyLoading));
+        } 
 
         #endregion
 
+        #endregion
     }
 }

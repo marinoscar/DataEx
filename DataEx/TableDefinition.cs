@@ -27,6 +27,8 @@ namespace DataEx
 
         #endregion
 
+        public const string TableDefinitionCacheKey = "EntityTableDefinitions";
+
         #region Property Implementation
 
         public Type TableType { get; private set; }
