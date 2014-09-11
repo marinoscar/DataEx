@@ -51,10 +51,12 @@
     <Compile Include="DatabaseContext.cs" />
     <Compile Include="DataList.cs" />
     <Compile Include="DataRecord.cs" />
+    <Compile Include="DbLogger.cs" />
     <Compile Include="DbTransactionProvider.cs" />
     <Compile Include="IDataContext.cs" />
     <Compile Include="IDataRecordExtensions.cs" />
     <Compile Include="IDbConnectionProvider.cs" />
+    <Compile Include="IDbLogger.cs" />
     <Compile Include="IDbTransactionProvider.cs" />
     <Compile Include="IDictionaryLoader.cs" />
     <Compile Include="ISqlDialectProvider.cs" />

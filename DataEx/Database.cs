@@ -23,6 +23,7 @@ namespace DataEx
         private static Dictionary<string, List<string>> _typePrimaryFieldNames;
         private readonly IObjectAccesor _objectAccesor;
         private ISqlLanguageProvider _languageProvider;
+        private IDbLogger _logger;
 
         #endregion
 
@@ -96,6 +97,11 @@ namespace DataEx
 
         #region Property Implementation
 
+        public IDbLogger Logger
+        {
+            get { return _logger ?? (_logger = DbConfiguration.Get<IDbLogger>()); }
+            set { _logger = value; }
+        }
         public IDbTransactionProvider TransactionProvider { get; set; }
         public DatabaseProviderType ProviderType { get; private set; }
 
@@ -254,6 +260,7 @@ namespace DataEx
                 cmd.Connection = conn;
                 cmd.Transaction = TransactionProvider.BeginTransaction();
                 cmd.CommandTimeout = CommandTimeoutInSeconds;
+                Log("Executing Command\nTimeout: {0}\nOn Transaction:{1}\n\n{2}".Fi(CommandTimeoutInSeconds, cmd.Transaction != null, sqlStatement));
                 try
                 {
                     return doSomething(cmd);
@@ -261,8 +268,16 @@ namespace DataEx
                 catch (Exception ex)
                 {
                     if (cmd.Transaction != null)
+                    {
+                        Log("Rolling back transaction");
                         cmd.Transaction.Rollback();
-                    throw new DataException("Error running statement:\n{0}\n{1}\n\n with user {2}".Fi(sqlStatement, ex.Message, _userName), ex);
+                    }
+                    var dbEx =
+                        new DataException(
+                            "Error running statement:\n{0}\n{1}\n\n with user {2}".Fi(sqlStatement, ex.Message,
+                                                                                      _userName), ex);
+                    Log(dbEx.ToString());
+                    throw dbEx;
                 }
             });
         }
@@ -280,6 +295,12 @@ namespace DataEx
         #endregion
 
         #region Private Methods
+
+        private void Log(string message)
+        {
+            if (Logger == null || !Logger.IsEnabled) return;
+            Logger.Log(message);
+        }
 
         private static List<string> GetTypePrimaryFieldNames(Type type)
         {
@@ -376,7 +397,7 @@ namespace DataEx
             try
             {
                 conn.ConnectionString = ConnectionString;
-                if(conn.State == ConnectionState.Closed)
+                if (conn.State == ConnectionState.Closed)
                     conn.Open();
             }
             catch (Exception ex)
@@ -435,7 +456,7 @@ namespace DataEx
         public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, Expression<Func<T, object>> orderBy, bool orderByDescending, uint skip, uint take, bool lazyLoading)
         {
             return ExecuteToList<T>(_languageProvider.Select(expression, orderBy, orderByDescending, skip, take, lazyLoading));
-        } 
+        }
 
         #endregion
 

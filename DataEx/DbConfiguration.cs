@@ -16,7 +16,8 @@ namespace DataEx
         private static DatabaseProviderType _providerType;
         private static int _commandTimeout;
         private static string _connecitonString;
-        private static Dictionary<DatabaseProviderType, Action> _initalizers; 
+        private static Dictionary<DatabaseProviderType, Action> _initalizers;
+        private static bool _isInitialized;
 
         public const string ExtendedFieldSeparator = "___";
         public const string ExtendedFieldPrefix = "extended" + ExtendedFieldSeparator;
@@ -94,6 +95,7 @@ namespace DataEx
         {
             if (_initalizers == null) LoadInitializers();
             _initalizers[DefaultProviderType]();
+            _isInitialized = true;
         }
 
         private static void Initialize(DatabaseProviderType providerType)
@@ -108,15 +110,15 @@ namespace DataEx
             if (_initalizers == null) _initalizers = new Dictionary<DatabaseProviderType, Action>();
             RegisterInitializer(DatabaseProviderType.MySql, InitializeMySql);
             RegisterInitializer(DatabaseProviderType.SqlServer, InitializeSqlServer);
-            RegisterInitializer(DatabaseProviderType.Oracle, InitializeAnsi);
-            RegisterInitializer(DatabaseProviderType.Postgresql, InitializeAnsi);
-            RegisterInitializer(DatabaseProviderType.Db2, InitializeAnsi);
-            RegisterInitializer(DatabaseProviderType.None, InitializeAnsi);
+            RegisterInitializer(DatabaseProviderType.Oracle, InitializeOracle);
+            RegisterInitializer(DatabaseProviderType.Postgresql, InitializePostgresql);
+            RegisterInitializer(DatabaseProviderType.Db2, InitializeDb2);
         }
 
         private static void InitializeMySql()
         {
             DefaultProviderType = DatabaseProviderType.MySql;
+            ObjectContainer.Register<IDbLogger>(new EmptyDbLogger());
             ObjectContainer.Register<IObjectAccesor>(new FastReflectionObjectAccessor());
             ObjectContainer.Register<ISqlDialectProvider>(new MySqlDialectProvider());
             ObjectContainer.Register<ISqlExpressionProvider>(new SqlExpressionProvider(ObjectContainer.Get<ISqlDialectProvider>()));
@@ -127,6 +129,7 @@ namespace DataEx
         private static void InitializeSqlServer()
         {
             DefaultProviderType = DatabaseProviderType.MySql;
+            ObjectContainer.Register<IDbLogger>(new EmptyDbLogger());
             ObjectContainer.Register<IObjectAccesor>(new FastReflectionObjectAccessor());
             ObjectContainer.Register<IDbTransactionProvider>(() => new NullDbTransactionProvider(new DbConnectionProvider()));
             ObjectContainer.Register<ISqlDialectProvider>(new SqlServerDialectProvider());
@@ -134,9 +137,25 @@ namespace DataEx
             ObjectContainer.Register<ISqlLanguageProvider>(new SqlServerLanguageProvider(ObjectContainer.Get<ISqlExpressionProvider>(), ObjectContainer.Get<IObjectAccesor>()));
         }
 
-        private static void InitializeAnsi()
+        private static void InitializeOracle()
         {
-            DefaultProviderType = DatabaseProviderType.MySql;
+            InitializeAnsi(DatabaseProviderType.Oracle);
+        }
+
+        private static void InitializePostgresql()
+        {
+            InitializeAnsi(DatabaseProviderType.Postgresql);
+        }
+
+        private static void InitializeDb2()
+        {
+            InitializeAnsi(DatabaseProviderType.Db2);
+        }
+
+        private static void InitializeAnsi(DatabaseProviderType providerType)
+        {
+            DefaultProviderType = providerType;
+            ObjectContainer.Register<IDbLogger>(new EmptyDbLogger());
             ObjectContainer.Register<IObjectAccesor>(new FastReflectionObjectAccessor());
             ObjectContainer.Register<IDbTransactionProvider>(() => new NullDbTransactionProvider(new DbConnectionProvider()));
             ObjectContainer.Register<ISqlDialectProvider>(new AnsiSqlDialectProvider());
@@ -156,8 +175,11 @@ namespace DataEx
 
         internal static T Get<T>()
         {
-            if(!ObjectContainer.IsRegistered<T>())
+            var isRegistered = ObjectContainer.IsRegistered<T>();
+            if(!isRegistered && !_isInitialized)
                 Initialize();
+            if (!isRegistered)
+                return default(T);
             return ObjectContainer.Get<T>();
         }
 
