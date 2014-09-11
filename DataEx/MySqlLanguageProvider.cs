@@ -12,7 +12,7 @@ namespace DataEx
         #region Constructor
 
         public MySqlLanguageProvider()
-            : this(new SqlExpressionProvider(new MySqlDialectProvider()), new FastReflectionObjectAccessor())
+            : this(DbConfiguration.Get<ISqlExpressionProvider>(), DbConfiguration.Get<IObjectAccesor>())
         {
 
         }

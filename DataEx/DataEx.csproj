@@ -60,17 +60,16 @@
     <Compile Include="ISqlDialectProvider.cs" />
     <Compile Include="ISqlExpressionProvider.cs" />
     <Compile Include="ISqlLanguageProvider.cs" />
-    <Compile Include="ITransactionResolver.cs" />
     <Compile Include="IUnitOfWork.cs" />
     <Compile Include="MySqlLanguageProvider.cs" />
     <Compile Include="SqlDialectProvider.cs" />
     <Compile Include="NullDbTransactionProvider.cs" />
-    <Compile Include="NullTransactionResolver.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RepositoryBase.cs" />
     <Compile Include="SqlExpressionProvider.cs" />
     <Compile Include="SqlLanguageProviderFactory.cs" />
     <Compile Include="SqlLanguageProviderHelper.cs" />
+    <Compile Include="SqlServerLanguageProvider.cs" />
     <Compile Include="TableDefinition.cs" />
   </ItemGroup>
   <ItemGroup>

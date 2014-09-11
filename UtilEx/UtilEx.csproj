@@ -63,6 +63,7 @@
     <Compile Include="JsonSerializer.cs" />
     <Compile Include="NumericBaseConverter.cs" />
     <Compile Include="ObjectCacheProvider.cs" />
+    <Compile Include="ObjectContainer.cs" />
     <Compile Include="ObjectExtensions.cs" />
     <Compile Include="ObjectHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

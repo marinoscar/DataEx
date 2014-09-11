@@ -34,14 +34,14 @@ namespace DataEx
 
         }
 
-        public Database(string connectionString) : this(connectionString, DatabaseProviderType.None, new NullDbTransactionProvider(), new FastReflectionObjectAccessor(), SqlLanguageProviderFactory.GetProvider(DbConfiguration.DefaultProviderType)) { }
+        public Database(string connectionString) : this(connectionString, DatabaseProviderType.None, DbConfiguration.Get<IDbTransactionProvider>(), DbConfiguration.Get<IObjectAccesor>(), DbConfiguration.Get<ISqlLanguageProvider>()) { }
 
-        public Database(string connectionString, DatabaseProviderType providerType) : this(connectionString, providerType, new NullDbTransactionProvider(), new FastReflectionObjectAccessor(), SqlLanguageProviderFactory.GetProvider(providerType)) { }
+        public Database(string connectionString, DatabaseProviderType providerType) : this(connectionString, providerType, DbConfiguration.Get<IDbTransactionProvider>(), DbConfiguration.Get<IObjectAccesor>(), DbConfiguration.Get<ISqlLanguageProvider>()) { }
 
-        public Database(string connectionString, IDbTransactionProvider transactionProvider) : this(connectionString, DatabaseProviderType.None, transactionProvider, new FastReflectionObjectAccessor(), SqlLanguageProviderFactory.GetProvider(DbConfiguration.DefaultProviderType)) { }
+        public Database(string connectionString, IDbTransactionProvider transactionProvider) : this(connectionString, DatabaseProviderType.None, transactionProvider, DbConfiguration.Get<IObjectAccesor>(), DbConfiguration.Get<ISqlLanguageProvider>()) { }
 
         public Database(string connectionString, DatabaseProviderType providerType, IDbTransactionProvider transactionProvider)
-            : this(connectionString, providerType, transactionProvider, new FastReflectionObjectAccessor(), SqlLanguageProviderFactory.GetProvider(providerType))
+            : this(connectionString, providerType, transactionProvider, DbConfiguration.Get<IObjectAccesor>(), DbConfiguration.Get<ISqlLanguageProvider>())
         {
         }
 

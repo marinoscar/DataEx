@@ -4,6 +4,7 @@ using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using UtilEx;
 
 namespace DataEx
 {
@@ -15,6 +16,7 @@ namespace DataEx
         private static DatabaseProviderType _providerType;
         private static int _commandTimeout;
         private static string _connecitonString;
+        private static Dictionary<DatabaseProviderType, Action> _initalizers; 
 
         public const string ExtendedFieldSeparator = "___";
         public const string ExtendedFieldPrefix = "extended" + ExtendedFieldSeparator;
@@ -76,6 +78,100 @@ namespace DataEx
             var commandTimeOut = ConfigurationManager.AppSettings["DatabaseCommandTimeout"];
             _commandTimeout = String.IsNullOrWhiteSpace(commandTimeOut) ? 15 : Convert.ToInt32(commandTimeOut);
             return _commandTimeout;
+        }
+
+        #endregion
+
+        #region Methods
+
+        public static void RegisterInitializer(DatabaseProviderType providerType, Action initializer)
+        {
+            if(_initalizers == null) _initalizers = new Dictionary<DatabaseProviderType, Action>();
+            _initalizers[providerType] = initializer;
+        }
+
+        public static void Initialize()
+        {
+            if (_initalizers == null) LoadInitializers();
+            _initalizers[DefaultProviderType]();
+        }
+
+        private static void Initialize(DatabaseProviderType providerType)
+        {
+            if (_initalizers == null) LoadInitializers();
+            _initalizers[providerType]();
+        }
+
+        private static void LoadInitializers()
+        {
+            if (_initalizers != null) return;
+            if (_initalizers == null) _initalizers = new Dictionary<DatabaseProviderType, Action>();
+            RegisterInitializer(DatabaseProviderType.MySql, InitializeMySql);
+            RegisterInitializer(DatabaseProviderType.SqlServer, InitializeSqlServer);
+            RegisterInitializer(DatabaseProviderType.Oracle, InitializeAnsi);
+            RegisterInitializer(DatabaseProviderType.Postgresql, InitializeAnsi);
+            RegisterInitializer(DatabaseProviderType.Db2, InitializeAnsi);
+            RegisterInitializer(DatabaseProviderType.None, InitializeAnsi);
+        }
+
+        private static void InitializeMySql()
+        {
+            DefaultProviderType = DatabaseProviderType.MySql;
+            ObjectContainer.Register<IObjectAccesor>(new FastReflectionObjectAccessor());
+            ObjectContainer.Register<ISqlDialectProvider>(new MySqlDialectProvider());
+            ObjectContainer.Register<ISqlExpressionProvider>(new SqlExpressionProvider(ObjectContainer.Get<ISqlDialectProvider>()));
+            ObjectContainer.Register<ISqlLanguageProvider>(new MySqlLanguageProvider(ObjectContainer.Get<ISqlExpressionProvider>(), ObjectContainer.Get<IObjectAccesor>()));
+            ObjectContainer.Register<IDbTransactionProvider>(() => new NullDbTransactionProvider(new DbConnectionProvider()));
+        }
+
+        private static void InitializeSqlServer()
+        {
+            DefaultProviderType = DatabaseProviderType.MySql;
+            ObjectContainer.Register<IObjectAccesor>(new FastReflectionObjectAccessor());
+            ObjectContainer.Register<IDbTransactionProvider>(() => new NullDbTransactionProvider(new DbConnectionProvider()));
+            ObjectContainer.Register<ISqlDialectProvider>(new SqlServerDialectProvider());
+            ObjectContainer.Register<ISqlExpressionProvider>(new SqlExpressionProvider(ObjectContainer.Get<ISqlDialectProvider>()));
+            ObjectContainer.Register<ISqlLanguageProvider>(new SqlServerLanguageProvider(ObjectContainer.Get<ISqlExpressionProvider>(), ObjectContainer.Get<IObjectAccesor>()));
+        }
+
+        private static void InitializeAnsi()
+        {
+            DefaultProviderType = DatabaseProviderType.MySql;
+            ObjectContainer.Register<IObjectAccesor>(new FastReflectionObjectAccessor());
+            ObjectContainer.Register<IDbTransactionProvider>(() => new NullDbTransactionProvider(new DbConnectionProvider()));
+            ObjectContainer.Register<ISqlDialectProvider>(new AnsiSqlDialectProvider());
+            ObjectContainer.Register<ISqlExpressionProvider>(new SqlExpressionProvider(ObjectContainer.Get<ISqlDialectProvider>()));
+            ObjectContainer.Register<ISqlLanguageProvider>(new AnsiSqlLanguageProvider(ObjectContainer.Get<ISqlExpressionProvider>(), ObjectContainer.Get<ISqlDialectProvider>(), ObjectContainer.Get<IObjectAccesor>()));
+        }
+
+        public static void Initialize(IObjectAccesor objectAccesor, ISqlDialectProvider dialectProvider, ISqlExpressionProvider expressionProvider, ISqlLanguageProvider languageProvider, Func<IDbTransactionProvider> transactionProvider, DatabaseProviderType providerType)
+        {
+            DefaultProviderType = providerType;
+            ObjectContainer.Register<ISqlDialectProvider>(dialectProvider);
+            ObjectContainer.Register<ISqlExpressionProvider>(expressionProvider);
+            ObjectContainer.Register<ISqlLanguageProvider>(languageProvider);
+            ObjectContainer.Register<IObjectAccesor>(objectAccesor);
+            ObjectContainer.Register<IDbTransactionProvider>(transactionProvider);
+        } 
+
+        internal static T Get<T>()
+        {
+            if(!ObjectContainer.IsRegistered<T>())
+                Initialize();
+            return ObjectContainer.Get<T>();
+        }
+
+        public static Database CreateDatabase()
+        {
+            return CreateDatabase(DefaultConnectionString);
+        }
+
+        public static Database CreateDatabase(string connectionString)
+        {
+            return new Database(connectionString, DefaultProviderType, 
+                Get<IDbTransactionProvider>(),
+                Get<IObjectAccesor>(),
+                Get<ISqlLanguageProvider>());
         }
 
         #endregion

@@ -79,93 +79,25 @@ namespace UtilEx
             if (functionToGetValue == null)
                 throw new ArgumentNullException("The key {0} is not cached and no function was provided to properly store the value in cache".Fi(key));
             var value = functionToGetValue(key);
-            Internal.Add(key, value);
+            SetCacheItem(key, value);
             return value;
         }
 
+        /// <summary>
+        /// Sets the item in the cache
+        /// </summary>
+        /// <param name="key">Item Key</param>
+        /// <param name="value">Item Value</param>
+        public void SetCacheItem(TKey key, TValue value)
+        {
+            if (Internal.ContainsKey(key)) return;
+            Internal.Add(key,value);
+        }
 
-        //#region IDictionary Members
-
-        //public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
-        //{
-        //    return Internal.GetEnumerator();
-        //}
-
-        //IEnumerator IEnumerable.GetEnumerator()
-        //{
-        //    return GetEnumerator();
-        //}
-
-        //public void Add(KeyValuePair<TKey, TValue> item)
-        //{
-        //    Internal.Add(item.Key, item.Value);
-        //}
-
-        //public void Clear()
-        //{
-        //    Internal.Clear();
-        //}
-
-        //public bool Contains(KeyValuePair<TKey, TValue> item)
-        //{
-        //    return Internal.Contains(item);
-        //}
-
-        //public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
-        //{
-        //    throw new NotImplementedException();
-        //}
-
-        //public bool Remove(KeyValuePair<TKey, TValue> item)
-        //{
-        //    Internal.Remove(item.Key);
-        //}
-
-        //public int Count
-        //{
-        //    get { return Internal.Count; }
-        //}
-
-        //public bool IsReadOnly
-        //{
-        //    get { return false; }
-        //}
-        //public bool ContainsKey(TKey key)
-        //{
-        //    return Internal.ContainsKey(key);
-        //}
-
-        //public void Add(TKey key, TValue value)
-        //{
-        //    Internal.Add(key, value);
-        //}
-
-        //public bool Remove(TKey key)
-        //{
-        //    return Internal.Remove(key);
-        //}
-
-        //public bool TryGetValue(TKey key, out TValue value)
-        //{
-        //    return Internal.TryGetValue(key, out value);
-        //}
-
-        //public TValue this[TKey key]
-        //{
-        //    get { return Internal[key]; }
-        //    set { Internal[key] = value; }
-        //}
-
-        //public ICollection<TKey> Keys
-        //{
-        //    get { return Internal.Keys; }
-        //}
-        //public ICollection<TValue> Values
-        //{
-        //    get { return Internal.Values; }
-        //}
-
-        //#endregion
+        public bool ContainsKey(TKey key)
+        {
+            return Internal.ContainsKey(key);
+        }
 
     }
 }
