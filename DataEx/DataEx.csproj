@@ -48,7 +48,7 @@
     <Compile Include="Database.cs" />
     <Compile Include="DbConfiguration.cs" />
     <Compile Include="DbConnectionProvider.cs" />
-    <Compile Include="DatabaseContext.cs" />
+    <Compile Include="DbContext.cs" />
     <Compile Include="DataList.cs" />
     <Compile Include="DataRecord.cs" />
     <Compile Include="DbLogger.cs" />

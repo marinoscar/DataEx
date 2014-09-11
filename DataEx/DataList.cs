@@ -97,7 +97,12 @@ namespace DataEx
             Add(item, false);
         }
 
-        public void Add(T item, bool isUpdate)
+        public void Update(T item)
+        {
+            Add(item, true);
+        }
+
+        private void Add(T item, bool isUpdate)
         {
             var newItem = new DataListItem<T>(item);
             if (isUpdate)

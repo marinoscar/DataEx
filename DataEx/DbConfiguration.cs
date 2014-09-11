@@ -119,6 +119,7 @@ namespace DataEx
         {
             DefaultProviderType = DatabaseProviderType.MySql;
             ObjectContainer.Register<IDbLogger>(new EmptyDbLogger());
+            ObjectContainer.Register<IDbConnectionProvider>(new DbConnectionProvider());
             ObjectContainer.Register<IObjectAccesor>(new FastReflectionObjectAccessor());
             ObjectContainer.Register<ISqlDialectProvider>(new MySqlDialectProvider());
             ObjectContainer.Register<ISqlExpressionProvider>(new SqlExpressionProvider(ObjectContainer.Get<ISqlDialectProvider>()));
@@ -130,6 +131,7 @@ namespace DataEx
         {
             DefaultProviderType = DatabaseProviderType.MySql;
             ObjectContainer.Register<IDbLogger>(new EmptyDbLogger());
+            ObjectContainer.Register<IDbConnectionProvider>(new DbConnectionProvider());
             ObjectContainer.Register<IObjectAccesor>(new FastReflectionObjectAccessor());
             ObjectContainer.Register<IDbTransactionProvider>(() => new NullDbTransactionProvider(new DbConnectionProvider()));
             ObjectContainer.Register<ISqlDialectProvider>(new SqlServerDialectProvider());
@@ -156,6 +158,7 @@ namespace DataEx
         {
             DefaultProviderType = providerType;
             ObjectContainer.Register<IDbLogger>(new EmptyDbLogger());
+            ObjectContainer.Register<IDbConnectionProvider>(new DbConnectionProvider());
             ObjectContainer.Register<IObjectAccesor>(new FastReflectionObjectAccessor());
             ObjectContainer.Register<IDbTransactionProvider>(() => new NullDbTransactionProvider(new DbConnectionProvider()));
             ObjectContainer.Register<ISqlDialectProvider>(new AnsiSqlDialectProvider());
@@ -192,8 +195,22 @@ namespace DataEx
         {
             return new Database(connectionString, DefaultProviderType, 
                 Get<IDbTransactionProvider>(),
-                Get<IObjectAccesor>(),
-                Get<ISqlLanguageProvider>());
+                Get<IObjectAccesor>());
+        }
+
+        public static IDataContext CreateContext()
+        {
+            return CreateContext(CreateDatabase());
+        }
+
+        public static IDataContext CreateContext(string connectionString)
+        {
+            return CreateContext(CreateDatabase(connectionString));
+        }
+
+        private static IDataContext CreateContext(Database db)
+        {
+            return new DbContext(db, Get<ISqlLanguageProvider>());
         }
 
         #endregion

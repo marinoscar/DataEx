@@ -22,7 +22,6 @@ namespace DataEx
         private readonly string _connectionString;
         private static Dictionary<string, List<string>> _typePrimaryFieldNames;
         private readonly IObjectAccesor _objectAccesor;
-        private ISqlLanguageProvider _languageProvider;
         private IDbLogger _logger;
 
         #endregion
@@ -35,18 +34,18 @@ namespace DataEx
 
         }
 
-        public Database(string connectionString) : this(connectionString, DatabaseProviderType.None, DbConfiguration.Get<IDbTransactionProvider>(), DbConfiguration.Get<IObjectAccesor>(), DbConfiguration.Get<ISqlLanguageProvider>()) { }
+        public Database(string connectionString) : this(connectionString, DatabaseProviderType.None, DbConfiguration.Get<IDbTransactionProvider>(), DbConfiguration.Get<IObjectAccesor>()) { }
 
-        public Database(string connectionString, DatabaseProviderType providerType) : this(connectionString, providerType, DbConfiguration.Get<IDbTransactionProvider>(), DbConfiguration.Get<IObjectAccesor>(), DbConfiguration.Get<ISqlLanguageProvider>()) { }
+        public Database(string connectionString, DatabaseProviderType providerType) : this(connectionString, providerType, DbConfiguration.Get<IDbTransactionProvider>(), DbConfiguration.Get<IObjectAccesor>()) { }
 
-        public Database(string connectionString, IDbTransactionProvider transactionProvider) : this(connectionString, DatabaseProviderType.None, transactionProvider, DbConfiguration.Get<IObjectAccesor>(), DbConfiguration.Get<ISqlLanguageProvider>()) { }
+        public Database(string connectionString, IDbTransactionProvider transactionProvider) : this(connectionString, DatabaseProviderType.None, transactionProvider, DbConfiguration.Get<IObjectAccesor>()) { }
 
         public Database(string connectionString, DatabaseProviderType providerType, IDbTransactionProvider transactionProvider)
-            : this(connectionString, providerType, transactionProvider, DbConfiguration.Get<IObjectAccesor>(), DbConfiguration.Get<ISqlLanguageProvider>())
+            : this(connectionString, providerType, transactionProvider, DbConfiguration.Get<IObjectAccesor>())
         {
         }
 
-        public Database(string connectionString, DatabaseProviderType providerType, IDbTransactionProvider transactionProvider, IObjectAccesor objectAccesor, ISqlLanguageProvider sqlLanguageProvider)
+        public Database(string connectionString, DatabaseProviderType providerType, IDbTransactionProvider transactionProvider, IObjectAccesor objectAccesor)
         {
             if (providerType == DatabaseProviderType.None)
                 providerType = DbConfiguration.DefaultProviderType;
@@ -63,7 +62,6 @@ namespace DataEx
             CommandTimeoutInSeconds = DbConfiguration.DatabaseCommandTimeout;
             TransactionProvider = transactionProvider;
             _objectAccesor = objectAccesor;
-            _languageProvider = sqlLanguageProvider;
         }
 
         #endregion
@@ -406,59 +404,6 @@ namespace DataEx
             }
             return conn;
         }
-
-        #endregion
-
-        #region CRUD
-
-        public void Insert<T>(T item)
-        {
-            ExecuteNonQuery(_languageProvider.Insert(item));
-        }
-
-        public void Update<T>(T item)
-        {
-            ExecuteNonQuery(_languageProvider.Update(item));
-        }
-
-        public void Delete<T>(T item)
-        {
-            ExecuteNonQuery(_languageProvider.Delete(item));
-        }
-
-        public void Upsert<T>(IEnumerable<T> items)
-        {
-            ExecuteNonQuery(_languageProvider.Upsert(items));
-        }
-
-        #region Select Methods
-
-        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression)
-        {
-            return ExecuteToList<T>(_languageProvider.Select(expression, null, false, 0, 0, false));
-        }
-
-        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, Expression<Func<T, object>> orderBy, bool orderByDescending)
-        {
-            return ExecuteToList<T>(_languageProvider.Select(expression, orderBy, orderByDescending, 0, 0, false));
-        }
-
-        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, Expression<Func<T, object>> orderBy, bool orderByDescending, bool lazyLoading)
-        {
-            return ExecuteToList<T>(_languageProvider.Select(expression, orderBy, orderByDescending, 0, 0, lazyLoading));
-        }
-
-        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, Expression<Func<T, object>> orderBy, bool orderByDescending, uint take, bool lazyLoading)
-        {
-            return ExecuteToList<T>(_languageProvider.Select(expression, orderBy, orderByDescending, 0, take, lazyLoading));
-        }
-
-        public IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, Expression<Func<T, object>> orderBy, bool orderByDescending, uint skip, uint take, bool lazyLoading)
-        {
-            return ExecuteToList<T>(_languageProvider.Select(expression, orderBy, orderByDescending, skip, take, lazyLoading));
-        }
-
-        #endregion
 
         #endregion
     }

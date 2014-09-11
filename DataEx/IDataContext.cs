@@ -13,8 +13,6 @@ namespace DataEx
         void Add<T>(T item);
         void Update<T>(T item);
         void Remove<T>(T item);
-        IQueryable<T> Select<T>(Expression<Func<T, bool>> expression);
-        IQueryable<T> Select<T>(Expression<Func<T, bool>> expression, bool lazyLoading);
-        IQueryable<T> Get<T>();
+        IEnumerable<T> Select<T>(Expression<Func<T, bool>> expression, Expression<Func<T, object>> orderBy, bool orderByDescending, uint skip, uint take, bool lazyLoading);
     }
 }
