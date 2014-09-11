@@ -33,6 +33,10 @@ namespace DataEx
         {
         }
 
+        public DbContext(Database db): this(db, DbConfiguration.Get<ISqlLanguageProvider>())
+        {
+        }
+
         public DbContext(Database db, ISqlLanguageProvider languageProvider)
         {
             _items = new Dictionary<Type, IDataListItems>();
