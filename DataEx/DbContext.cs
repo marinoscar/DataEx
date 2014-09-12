@@ -93,6 +93,7 @@ namespace DataEx
                 count += InsertRecords(transaction);
                 count += UpdateRecords(transaction);
             }
+            _items.Clear();
             return count;
         }
 
@@ -133,8 +134,15 @@ namespace DataEx
 
         private int UpsertRecords(IDbTransactionProvider transactionProvider)
         {
-            return ProcessRecord(transactionProvider, (i => i.Status != DataListItemStatus.Deleted),
-                                 LanguageProvider.Update);
+            Database.TransactionProvider = transactionProvider;
+            var sb = new StringBuilder();
+            foreach (var modelType in _items)
+            {
+                var list = modelType.Value.GetItems();
+                var items = list.Where(i => i.Status != DataListItemStatus.Deleted);
+                sb.AppendFormat("{0};\n",LanguageProvider.Upsert(items.Select(i => i.Value)));
+            }
+            return sb.Length <= 0 ? 0 : Database.ExecuteNonQuery(sb.ToString());
         }
 
         private int InsertRecords(IDbTransactionProvider transactionProvider)
@@ -168,6 +176,7 @@ namespace DataEx
                     sb.AppendFormat("{0};\n", action(item.Value));
                 }
             }
+            if (sb.Length <= 0) return 0;
             return Database.ExecuteNonQuery(sb.ToString());
         } 
 

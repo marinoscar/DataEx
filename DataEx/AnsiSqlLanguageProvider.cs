@@ -39,7 +39,7 @@ namespace DataEx
         #region Property Implementation
 
         public DatabaseProviderType ProviderType { get { return DatabaseProviderType.None; } }
-        public bool IsUpsertSupported { get { return false; } }
+        public virtual bool IsUpsertSupported { get { return false; } }
 
         protected virtual ISqlExpressionProvider ExpressionProvider
         {

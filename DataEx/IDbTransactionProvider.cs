@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace DataEx
 {
-    public interface IDbTransactionProvider : IDbConnectionProvider
+    public interface IDbTransactionProvider : IDbConnectionProvider, IDisposable
     {
         IDbTransaction BeginTransaction();
         IDbTransaction BeginTransaction(IsolationLevel isolationLevel);

@@ -30,10 +30,14 @@ namespace DataEx
             return result;
         }
 
+        public string ConnectionString { get; set; }
+
         public IDbConnection GetConnection(DatabaseProviderType providerType)
         {
             var factory = GetFactoryFromProvider(providerType);
-            return factory.CreateConnection();
+            var conn = factory.CreateConnection();
+            conn.ConnectionString = ConnectionString;
+            return conn;
         }
     }
 }

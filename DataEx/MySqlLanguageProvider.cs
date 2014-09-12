@@ -51,7 +51,9 @@ namespace DataEx
 
         public override string Upsert<T>(IEnumerable<T> items)
         {
-            var tableDef = _helper.GetTableDefinition(typeof (T));
+            if (items == null || !items.Any()) return string.Empty;
+            var itemType = items.First().GetType();
+            var tableDef = _helper.GetTableDefinition(itemType);
             var columns = tableDef.Columns.Where(i => !i.IsAutoIncrement);
             var sb = new StringBuilder();
             sb.AppendFormat("INSERT INTO {0} ({1}) VALUES\n", _helper.GetQualifiedTableName(tableDef),
@@ -67,7 +69,11 @@ namespace DataEx
                                         columns.Select(
                                             i => string.Format("{0}=VALUES({0})", _helper.GetQualifiedColumnName(i)))));
             return sb.ToString();
+        }
 
+        public override bool IsUpsertSupported
+        {
+            get { return true; }
         }
     }
 }

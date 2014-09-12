@@ -23,6 +23,7 @@ namespace DataEx
             _connectionProvider = connectionProvider;
         }
 
+        public string ConnectionString { get; set; }
 
         public IDbConnection GetConnection(DatabaseProviderType providerType)
         {
@@ -42,6 +43,10 @@ namespace DataEx
         public bool ProvideTransaction
         {
             get { return false; }
+        }
+
+        public void Dispose()
+        {
         }
     }
 }

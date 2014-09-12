@@ -13,6 +13,7 @@ namespace DataEx
         private IDbConnection _connection;
         private readonly IDbConnectionProvider _connectionProvider;
         private DatabaseProviderType _providerType;
+        private IDbTransaction _transaction;
 
         public bool ProvideTransaction
         {
@@ -36,16 +37,28 @@ namespace DataEx
 
         public IDbTransaction BeginTransaction(IsolationLevel isolationLevel)
         {
-            var connection = GetConnection(_providerType);
+            if (_connection == null)
+                _connection = GetConnection(_providerType);
             if(_connection.State == ConnectionState.Closed)
-                connection.Open();
-            return connection.BeginTransaction(isolationLevel);
+                _connection.Open();
+            if (_transaction == null)
+                _transaction = _connection.BeginTransaction(isolationLevel);
+            return _transaction;
         }
 
         public IDbConnection GetConnection(DatabaseProviderType providerType)
         {
-            _providerType = providerType;
-            return _connection ?? (_connection = _connectionProvider.GetConnection(providerType));
+            _connectionProvider.ConnectionString = ConnectionString;
+            return _connectionProvider.GetConnection(providerType);
         }
+
+        public string ConnectionString { get; set; }
+
+        public void Dispose()
+        {
+            _connection = null;
+            _transaction = null;
+        }
+
     }
 }

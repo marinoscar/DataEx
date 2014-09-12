@@ -61,6 +61,8 @@ namespace DataEx
 
             CommandTimeoutInSeconds = DbConfiguration.DatabaseCommandTimeout;
             TransactionProvider = transactionProvider;
+            if (TransactionProvider != null)
+                TransactionProvider.ConnectionString = connectionString;
             _objectAccesor = objectAccesor;
         }
 
@@ -238,6 +240,7 @@ namespace DataEx
         {
             if (TransactionProvider.ProvideTransaction)
             {
+                TransactionProvider.ConnectionString = ConnectionString;
                 return doSomething(OpenConnection(TransactionProvider.GetConnection(ProviderType)));
             }
 
@@ -387,6 +390,7 @@ namespace DataEx
 
         private IDbConnection OpenConnection()
         {
+            TransactionProvider.ConnectionString = ConnectionString;
             return OpenConnection(TransactionProvider.GetConnection(ProviderType));
         }
 

@@ -9,6 +9,7 @@ namespace DataEx
 {
     public interface IDbConnectionProvider
     {
+        string ConnectionString { get; set; }
         IDbConnection GetConnection(DatabaseProviderType providerType);
     }
 }
